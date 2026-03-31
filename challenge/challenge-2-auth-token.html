@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Challenge 2 — Auth Token Lifecycle</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Sora:wght@300;500;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #faf9f7;
+    --surface: #ffffff;
+    --border: #e5e2dc;
+    --text: #1a1a1a;
+    --muted: #8a8580;
+    --accent: #c45d3e;
+    --green: #2d8a4e;
+    --red: #c45d3e;
+    --code-bg: #f0ede8;
+  }
+
+  body {
+    font-family: 'Sora', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem;
+  }
+
+  .container {
+    max-width: 600px;
+    width: 100%;
+  }
+
+  .header {
+    margin-bottom: 2rem;
+    text-align: center;
+  }
+
+  .header h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+
+  .header p {
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin-top: 0.3rem;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .card h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 1rem;
+  }
+
+  /* Login Form */
+  .login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+
+  .login-form input {
+    font-family: 'IBM Plex Mono', monospace;
+    padding: 0.7rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+  }
+
+  .login-form input:focus {
+    border-color: var(--accent);
+  }
+
+  .btn {
+    font-family: 'Sora', sans-serif;
+    font-weight: 500;
+    padding: 0.7rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background: var(--text);
+    color: white;
+  }
+
+  .btn-primary:hover { opacity: 0.85; }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .btn-secondary:hover { background: var(--bg); }
+
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* Token Display */
+  .token-display {
+    background: var(--code-bg);
+    border-radius: 8px;
+    padding: 1rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    word-break: break-all;
+    color: var(--muted);
+    max-height: 80px;
+    overflow-y: auto;
+    margin-bottom: 0.8rem;
+  }
+
+  .timer {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1.5rem;
+    font-weight: 600;
+    text-align: center;
+    padding: 0.5rem;
+  }
+
+  .timer.warning { color: var(--accent); }
+  .timer.expired { color: var(--red); }
+
+  /* Response area */
+  .response-log {
+    max-height: 200px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .log-entry {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.78rem;
+    padding: 0.5rem 0.7rem;
+    border-radius: 6px;
+    background: var(--code-bg);
+  }
+
+  .log-entry.success { border-left: 3px solid var(--green); }
+  .log-entry.error { border-left: 3px solid var(--red); }
+  .log-entry.info { border-left: 3px solid var(--muted); }
+
+  .actions-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.8rem;
+    flex-wrap: wrap;
+  }
+
+  /* Session expired overlay */
+  .overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 100;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .overlay.visible {
+    display: flex;
+  }
+
+  .overlay-card {
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+    max-width: 400px;
+  }
+
+  .overlay-card h2 {
+    color: var(--red);
+    margin-bottom: 0.5rem;
+  }
+
+  .overlay-card p {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-bottom: 1.2rem;
+  }
+
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h1>SecureVault Dashboard</h1>
+    <p>Challenge 2 — JWT token expires in 30 seconds</p>
+  </div>
+
+  <!-- LOGIN VIEW -->
+  <div id="login-view">
+    <div class="card">
+      <h2>Sign In</h2>
+      <div class="login-form">
+        <input type="text" id="username" placeholder="Username" value="testuser" data-testid="username-input">
+        <input type="password" id="password" placeholder="Password" value="password123" data-testid="password-input">
+        <button class="btn btn-primary" id="login-btn" data-testid="login-button">Sign In</button>
+        <div id="login-error" style="color: var(--red); font-size: 0.8rem; display: none;" data-testid="login-error"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD VIEW -->
+  <div id="dashboard-view" class="hidden">
+    <div class="card">
+      <h2>Token Status</h2>
+      <div class="token-display" id="token-display" data-testid="token-display">—</div>
+      <div class="timer" id="token-timer" data-testid="token-timer">30s</div>
+    </div>
+
+    <div class="card">
+      <h2>API Console</h2>
+      <div class="response-log" id="response-log" data-testid="response-log"></div>
+      <div class="actions-row">
+        <button class="btn btn-primary" id="api-call-btn" data-testid="api-call-button">GET /api/profile</button>
+        <button class="btn btn-secondary" id="api-data-btn" data-testid="api-data-button">GET /api/data</button>
+        <button class="btn btn-secondary" id="logout-btn" data-testid="logout-button">Logout</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Session Info</h2>
+      <div id="session-info" data-testid="session-info" style="font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; color: var(--muted);"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SESSION EXPIRED OVERLAY -->
+<div class="overlay" id="session-expired-overlay" data-testid="session-expired-overlay">
+  <div class="overlay-card">
+    <h2>Session Expired</h2>
+    <p data-testid="session-expired-message">Your session has expired. Please sign in again to continue.</p>
+    <button class="btn btn-primary" id="relogin-btn" data-testid="relogin-button">Sign In Again</button>
+  </div>
+</div>
+
+<script>
+  // --- FAKE JWT ---
+  function createToken(username) {
+    const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+    const now = Math.floor(Date.now() / 1000);
+    const payload = btoa(JSON.stringify({
+      sub: username,
+      iat: now,
+      exp: now + 30, // 30 second expiry
+      role: 'user'
+    }));
+    const signature = btoa(`fake-sig-${Math.random().toString(36).slice(2)}`);
+    return `${header}.${payload}.${signature}`;
+  }
+
+  function parseToken(token) {
+    try {
+      const parts = token.split('.');
+      return JSON.parse(atob(parts[1]));
+    } catch {
+      return null;
+    }
+  }
+
+  function isTokenExpired(token) {
+    const payload = parseToken(token);
+    if (!payload) return true;
+    return Math.floor(Date.now() / 1000) > payload.exp;
+  }
+
+  // --- STATE ---
+  let authToken = null;
+  let timerInterval = null;
+
+  const loginView = document.getElementById('login-view');
+  const dashboardView = document.getElementById('dashboard-view');
+  const tokenDisplay = document.getElementById('token-display');
+  const tokenTimer = document.getElementById('token-timer');
+  const responseLog = document.getElementById('response-log');
+  const sessionInfo = document.getElementById('session-info');
+  const overlay = document.getElementById('session-expired-overlay');
+
+  // --- LOGIN ---
+  document.getElementById('login-btn').addEventListener('click', () => {
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const errorEl = document.getElementById('login-error');
+
+    if (username === 'testuser' && password === 'password123') {
+      authToken = createToken(username);
+      localStorage.setItem('auth_token', authToken);
+      sessionStorage.setItem('session_active', 'true');
+      errorEl.style.display = 'none';
+      showDashboard();
+    } else {
+      errorEl.textContent = 'Invalid credentials. Use testuser / password123';
+      errorEl.style.display = 'block';
+    }
+  });
+
+  // --- DASHBOARD ---
+  function showDashboard() {
+    loginView.classList.add('hidden');
+    dashboardView.classList.remove('hidden');
+    overlay.classList.remove('visible');
+
+    tokenDisplay.textContent = authToken;
+    updateSessionInfo();
+    startTimer();
+  }
+
+  function showLogin() {
+    authToken = null;
+    localStorage.removeItem('auth_token');
+    sessionStorage.removeItem('session_active');
+    clearInterval(timerInterval);
+
+    dashboardView.classList.add('hidden');
+    overlay.classList.remove('visible');
+    loginView.classList.remove('hidden');
+    responseLog.innerHTML = '';
+  }
+
+  function startTimer() {
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+      if (!authToken) return;
+
+      const payload = parseToken(authToken);
+      if (!payload) return;
+
+      const remaining = payload.exp - Math.floor(Date.now() / 1000);
+
+      if (remaining <= 0) {
+        tokenTimer.textContent = 'EXPIRED';
+        tokenTimer.className = 'timer expired';
+        clearInterval(timerInterval);
+        handleExpiry();
+      } else if (remaining <= 10) {
+        tokenTimer.textContent = `${remaining}s`;
+        tokenTimer.className = 'timer warning';
+      } else {
+        tokenTimer.textContent = `${remaining}s`;
+        tokenTimer.className = 'timer';
+      }
+
+      updateSessionInfo();
+    }, 1000);
+  }
+
+  function handleExpiry() {
+    overlay.classList.add('visible');
+    // Clear stored auth
+    localStorage.removeItem('auth_token');
+    sessionStorage.removeItem('session_active');
+  }
+
+  function updateSessionInfo() {
+    const payload = parseToken(authToken);
+    if (!payload) {
+      sessionInfo.textContent = 'No active session';
+      return;
+    }
+    const remaining = payload.exp - Math.floor(Date.now() / 1000);
+    sessionInfo.innerHTML = `
+      User: ${payload.sub}<br>
+      Issued: ${new Date(payload.iat * 1000).toLocaleTimeString()}<br>
+      Expires: ${new Date(payload.exp * 1000).toLocaleTimeString()}<br>
+      Remaining: ${Math.max(0, remaining)}s<br>
+      Storage token: ${localStorage.getItem('auth_token') ? 'present' : 'cleared'}<br>
+      Session flag: ${sessionStorage.getItem('session_active') || 'cleared'}
+    `;
+  }
+
+  // --- API SIMULATION ---
+  function simulateApiCall(endpoint) {
+    const logEntry = document.createElement('div');
+    logEntry.className = 'log-entry';
+
+    const timestamp = new Date().toLocaleTimeString();
+
+    if (!authToken || isTokenExpired(authToken)) {
+      logEntry.classList.add('error');
+      logEntry.textContent = `[${timestamp}] ${endpoint} → 401 Unauthorized: Token expired or missing`;
+      responseLog.appendChild(logEntry);
+      responseLog.scrollTop = responseLog.scrollHeight;
+
+      // Trigger expiry flow if not already showing
+      if (!overlay.classList.contains('visible')) {
+        handleExpiry();
+      }
+      return;
+    }
+
+    // Simulate network delay
+    logEntry.classList.add('info');
+    logEntry.textContent = `[${timestamp}] ${endpoint} → Requesting...`;
+    responseLog.appendChild(logEntry);
+
+    setTimeout(() => {
+      logEntry.classList.remove('info');
+      logEntry.classList.add('success');
+
+      const data = endpoint === '/api/profile'
+        ? { user: 'testuser', role: 'user', email: 'test@example.com' }
+        : { items: 42, lastSync: new Date().toISOString() };
+
+      logEntry.textContent = `[${timestamp}] ${endpoint} → 200 OK: ${JSON.stringify(data)}`;
+      logEntry.setAttribute('data-status', '200');
+      responseLog.scrollTop = responseLog.scrollHeight;
+    }, 300 + Math.random() * 500);
+  }
+
+  document.getElementById('api-call-btn').addEventListener('click', () => simulateApiCall('/api/profile'));
+  document.getElementById('api-data-btn').addEventListener('click', () => simulateApiCall('/api/data'));
+  document.getElementById('logout-btn').addEventListener('click', showLogin);
+  document.getElementById('relogin-btn').addEventListener('click', showLogin);
+
+  // --- PAGE LOAD: Check for existing session ---
+  window.addEventListener('load', () => {
+    const storedToken = localStorage.getItem('auth_token');
+    if (storedToken && !isTokenExpired(storedToken)) {
+      authToken = storedToken;
+      showDashboard();
+    } else {
+      // Clear any stale tokens
+      localStorage.removeItem('auth_token');
+      sessionStorage.removeItem('session_active');
+    }
+  });
+
+  // --- EXPOSE FOR TESTING ---
+  window.__AUTH__ = {
+    getToken: () => authToken,
+    isExpired: () => isTokenExpired(authToken),
+    getStoredToken: () => localStorage.getItem('auth_token'),
+    getSessionFlag: () => sessionStorage.getItem('session_active')
+  };
+</script>
+</body>
+</html>

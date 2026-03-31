@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Challenge 8 — Infinite Scroll & Filter</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{--bg:#f8fafc;--surface:#fff;--border:#e2e8f0;--text:#0f172a;--muted:#94a3b8;--accent:#0ea5e9;--tag-bg:#f0f9ff;--tag-text:#0369a1}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:2rem}
+  .container{max-width:800px;margin:0 auto}
+  h1{font-size:1.5rem;font-weight:700;margin-bottom:0.3rem}
+  .subtitle{color:var(--muted);font-size:0.8rem;margin-bottom:1.5rem}
+  .controls{display:flex;gap:0.8rem;margin-bottom:1.5rem;flex-wrap:wrap;align-items:center}
+  .search-input{flex:1;min-width:200px;padding:0.6rem 1rem;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.9rem;outline:none;transition:border 0.2s}
+  .search-input:focus{border-color:var(--accent)}
+  .filter-btn{padding:0.5rem 1rem;border:1px solid var(--border);border-radius:8px;background:var(--surface);cursor:pointer;font-family:inherit;font-size:0.8rem;transition:all 0.2s}
+  .filter-btn.active{background:var(--accent);color:white;border-color:var(--accent)}
+  .stats{font-size:0.8rem;color:var(--muted);margin-bottom:1rem;display:flex;gap:1.5rem}
+  .article-list{display:flex;flex-direction:column;gap:1rem}
+  .article-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.2rem;transition:transform 0.15s;animation:fadeIn 0.4s ease}
+  .article-card:hover{transform:translateY(-1px)}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(15px)}to{opacity:1;transform:translateY(0)}}
+  .article-title{font-weight:700;font-size:1rem;margin-bottom:0.4rem}
+  .article-excerpt{font-size:0.85rem;color:var(--muted);line-height:1.5;margin-bottom:0.6rem}
+  .article-meta{display:flex;gap:1rem;align-items:center;flex-wrap:wrap}
+  .article-author{font-size:0.8rem;font-weight:500}
+  .article-date{font-size:0.75rem;color:var(--muted)}
+  .article-tag{font-size:0.7rem;padding:0.15rem 0.5rem;background:var(--tag-bg);color:var(--tag-text);border-radius:4px;font-weight:500}
+  .loader{text-align:center;padding:2rem;color:var(--muted);font-size:0.9rem;display:none}
+  .loader.visible{display:block}
+  .spinner{display:inline-block;width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.6s linear infinite;margin-right:0.5rem;vertical-align:middle}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .end-message{text-align:center;padding:1.5rem;color:var(--muted);font-size:0.85rem;display:none}
+  .end-message.visible{display:block}
+  .no-results{text-align:center;padding:3rem;color:var(--muted)}
+  .scroll-top{position:fixed;bottom:2rem;right:2rem;width:40px;height:40px;border-radius:50%;background:var(--accent);color:white;border:none;font-size:1.2rem;cursor:pointer;display:none;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.15)}
+  .scroll-top.visible{display:flex}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Article Feed</h1>
+  <p class="subtitle">Challenge 8 — Infinite scroll with debounced search and category filters</p>
+  <div class="controls" data-testid="controls">
+    <input type="text" class="search-input" id="search" data-testid="search-input" placeholder="Search articles...">
+    <button class="filter-btn active" data-category="all" data-testid="filter-all">All</button>
+    <button class="filter-btn" data-category="tech" data-testid="filter-tech">Tech</button>
+    <button class="filter-btn" data-category="science" data-testid="filter-science">Science</button>
+    <button class="filter-btn" data-category="design" data-testid="filter-design">Design</button>
+    <button class="filter-btn" data-category="business" data-testid="filter-business">Business</button>
+  </div>
+  <div class="stats" data-testid="stats">
+    <span>Showing: <strong id="showing-count" data-testid="showing-count">0</strong></span>
+    <span>Total: <strong id="total-count" data-testid="total-count">0</strong></span>
+    <span>Category: <strong id="active-category" data-testid="active-category">all</strong></span>
+  </div>
+  <div class="article-list" id="article-list" data-testid="article-list"></div>
+  <div class="loader" id="loader" data-testid="loader"><span class="spinner"></span> Loading more articles...</div>
+  <div class="end-message" id="end-message" data-testid="end-message">🎉 You've reached the end!</div>
+  <div class="no-results" id="no-results" data-testid="no-results" style="display:none">No articles found matching your criteria.</div>
+</div>
+<button class="scroll-top" id="scroll-top" data-testid="scroll-top">↑</button>
+<script>
+const categories=['tech','science','design','business'];
+const authors=['Alice Chen','Bob Park','Carol Ruiz','Dave Kim','Eve Torres','Frank Wu','Grace Lee','Henry Patel'];
+const ALL_ARTICLES=[];
+for(let i=1;i<=200;i++){
+  const cat=categories[i%categories.length];
+  ALL_ARTICLES.push({id:i,title:`${cat.charAt(0).toUpperCase()+cat.slice(1)} Article #${i}: ${['Breaking','Deep Dive','Analysis','Review','Guide','Tutorial','Opinion','Case Study'][i%8]}`,excerpt:`This is a detailed ${cat} article covering important topics and insights. It explores various aspects of ${cat} with practical examples and expert commentary. Article number ${i} in our collection.`,author:authors[i%authors.length],date:new Date(2026,1,28-Math.floor(i/3)).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),category:cat});
+}
+const PAGE_SIZE=15;let currentPage=0;let activeCategory='all';let searchQuery='';let loading=false;let filteredArticles=ALL_ARTICLES;
+const list=document.getElementById('article-list');
+const loader=document.getElementById('loader');
+const endMsg=document.getElementById('end-message');
+const noResults=document.getElementById('no-results');
+
+function filterArticles(){
+  filteredArticles=ALL_ARTICLES.filter(a=>{
+    const matchCat=activeCategory==='all'||a.category===activeCategory;
+    const matchSearch=!searchQuery||a.title.toLowerCase().includes(searchQuery)||a.excerpt.toLowerCase().includes(searchQuery)||a.author.toLowerCase().includes(searchQuery);
+    return matchCat&&matchSearch;
+  });
+  currentPage=0;list.innerHTML='';endMsg.classList.remove('visible');
+  document.getElementById('total-count').textContent=filteredArticles.length;
+  document.getElementById('active-category').textContent=activeCategory;
+  if(filteredArticles.length===0){noResults.style.display='block';}else{noResults.style.display='none';loadMore();}
+}
+
+function loadMore(){
+  if(loading)return;const start=currentPage*PAGE_SIZE;const end=start+PAGE_SIZE;
+  if(start>=filteredArticles.length){endMsg.classList.add('visible');return;}
+  loading=true;loader.classList.add('visible');
+  setTimeout(()=>{
+    const page=filteredArticles.slice(start,end);
+    page.forEach(a=>{
+      const el=document.createElement('div');el.className='article-card';
+      el.setAttribute('data-testid',`article-${a.id}`);el.setAttribute('data-category',a.category);
+      el.innerHTML=`<div class="article-title" data-testid="article-title-${a.id}">${a.title}</div><div class="article-excerpt" data-testid="article-excerpt-${a.id}">${a.excerpt}</div><div class="article-meta"><span class="article-author" data-testid="article-author-${a.id}">${a.author}</span><span class="article-date">${a.date}</span><span class="article-tag" data-testid="article-tag-${a.id}">${a.category}</span></div>`;
+      list.appendChild(el);
+    });
+    currentPage++;loading=false;loader.classList.remove('visible');
+    document.getElementById('showing-count').textContent=Math.min(currentPage*PAGE_SIZE,filteredArticles.length);
+    if(currentPage*PAGE_SIZE>=filteredArticles.length)endMsg.classList.add('visible');
+  },800+Math.random()*1200);
+}
+
+// Infinite scroll
+const observer=new IntersectionObserver(entries=>{if(entries[0].isIntersecting&&!loading)loadMore();},{threshold:0.1});
+observer.observe(loader);
+
+// Search with debounce
+let debounceTimer;
+document.getElementById('search').addEventListener('input',e=>{clearTimeout(debounceTimer);debounceTimer=setTimeout(()=>{searchQuery=e.target.value.toLowerCase().trim();filterArticles();},400);});
+
+// Category filters
+document.querySelectorAll('.filter-btn').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');activeCategory=btn.dataset.category;filterArticles();});});
+
+// Scroll to top
+const scrollBtn=document.getElementById('scroll-top');
+window.addEventListener('scroll',()=>{scrollBtn.classList.toggle('visible',window.scrollY>500);});
+scrollBtn.addEventListener('click',()=>window.scrollTo({top:0,behavior:'smooth'}));
+
+filterArticles();
+window.__FEED__={getArticles:()=>filteredArticles,getShowing:()=>Math.min(currentPage*PAGE_SIZE,filteredArticles.length),isLoading:()=>loading,getCategory:()=>activeCategory,getSearch:()=>searchQuery};
+</script>
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Challenge 7 — File Upload & Validation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{--bg:#fafafa;--surface:#fff;--border:#e5e7eb;--text:#111827;--muted:#9ca3af;--accent:#6366f1;--red:#ef4444;--green:#22c55e;--orange:#f59e0b}
+  body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;justify-content:center;padding:2rem}
+  .container{max-width:600px;width:100%}
+  h1{font-size:1.5rem;margin-bottom:0.3rem} .subtitle{color:var(--muted);font-size:0.8rem;margin-bottom:2rem}
+  .upload-zone{border:2px dashed var(--border);border-radius:12px;padding:3rem 2rem;text-align:center;transition:all 0.3s;cursor:pointer;position:relative}
+  .upload-zone.dragover{border-color:var(--accent);background:rgba(99,102,241,0.05)}
+  .upload-zone.has-error{border-color:var(--red)}
+  .upload-icon{font-size:2.5rem;margin-bottom:0.5rem}
+  .upload-text{color:var(--muted);font-size:0.9rem}
+  .upload-text strong{color:var(--accent);cursor:pointer}
+  .upload-rules{margin-top:0.5rem;font-size:0.75rem;color:var(--muted)}
+  input[type="file"]{display:none}
+  .file-list{margin-top:1.5rem;display:flex;flex-direction:column;gap:0.8rem}
+  .file-item{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem;display:flex;align-items:center;gap:1rem;animation:slideIn 0.3s ease}
+  @keyframes slideIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  .file-icon{font-size:1.8rem}
+  .file-info{flex:1}
+  .file-name{font-weight:600;font-size:0.85rem;word-break:break-all}
+  .file-size{font-size:0.75rem;color:var(--muted)}
+  .file-status{font-size:0.75rem;font-weight:600;padding:0.2rem 0.5rem;border-radius:4px}
+  .file-status.uploading{color:var(--accent);background:rgba(99,102,241,0.1)}
+  .file-status.success{color:var(--green);background:rgba(34,197,94,0.1)}
+  .file-status.error{color:var(--red);background:rgba(239,68,68,0.1)}
+  .progress-bar{width:100%;height:4px;background:var(--border);border-radius:2px;margin-top:0.5rem;overflow:hidden}
+  .progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width 0.3s;width:0%}
+  .file-remove{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.2rem;padding:0.2rem}
+  .file-remove:hover{color:var(--red)}
+  .error-msg{color:var(--red);font-size:0.8rem;margin-top:0.5rem;padding:0.5rem;background:rgba(239,68,68,0.05);border-radius:6px;display:none}
+  .error-msg.visible{display:block}
+  .upload-summary{margin-top:1.5rem;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem;display:none}
+  .upload-summary.visible{display:block}
+  .summary-row{display:flex;justify-content:space-between;font-size:0.85rem;padding:0.3rem 0}
+  .summary-row .label{color:var(--muted)}
+  .submit-btn{margin-top:1rem;width:100%;padding:0.8rem;background:var(--accent);color:white;border:none;border-radius:8px;font-family:inherit;font-weight:600;font-size:0.9rem;cursor:pointer;transition:opacity 0.2s}
+  .submit-btn:disabled{opacity:0.4;cursor:not-allowed}
+  .submit-btn:hover:not(:disabled){opacity:0.9}
+  .toast{position:fixed;bottom:2rem;right:2rem;padding:0.8rem 1.2rem;border-radius:8px;color:white;font-size:0.85rem;font-weight:600;transform:translateY(100px);opacity:0;transition:all 0.3s}
+  .toast.show{transform:translateY(0);opacity:1}
+  .toast.success{background:var(--green)} .toast.error{background:var(--red)}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Upload Center</h1>
+  <p class="subtitle">Challenge 7 — File upload with drag-drop, validation, progress & preview</p>
+  <div class="upload-zone" id="upload-zone" data-testid="upload-zone">
+    <div class="upload-icon">📁</div>
+    <div class="upload-text"><strong>Click to browse</strong> or drag files here</div>
+    <div class="upload-rules" data-testid="upload-rules">Max 5 files • PNG, JPG, PDF only • Max 5MB each</div>
+    <input type="file" id="file-input" data-testid="file-input" multiple accept=".png,.jpg,.jpeg,.pdf">
+  </div>
+  <div class="error-msg" id="error-msg" data-testid="error-message"></div>
+  <div class="file-list" id="file-list" data-testid="file-list"></div>
+  <div class="upload-summary" id="upload-summary" data-testid="upload-summary">
+    <div class="summary-row"><span class="label">Total files:</span><span id="summary-count" data-testid="summary-count">0</span></div>
+    <div class="summary-row"><span class="label">Total size:</span><span id="summary-size" data-testid="summary-size">0 KB</span></div>
+    <div class="summary-row"><span class="label">Errors:</span><span id="summary-errors" data-testid="summary-errors">0</span></div>
+    <button class="submit-btn" id="submit-btn" data-testid="submit-button" disabled>Upload All</button>
+  </div>
+  <div class="toast" id="toast" data-testid="toast"></div>
+</div>
+<script>
+const ALLOWED_TYPES=['image/png','image/jpeg','application/pdf'];
+const MAX_SIZE=5*1024*1024;
+const MAX_FILES=5;
+let files=[];
+const zone=document.getElementById('upload-zone');
+const input=document.getElementById('file-input');
+const fileList=document.getElementById('file-list');
+const errorMsg=document.getElementById('error-msg');
+const summary=document.getElementById('upload-summary');
+const submitBtn=document.getElementById('submit-btn');
+
+zone.addEventListener('click',()=>input.click());
+zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('dragover');});
+zone.addEventListener('dragleave',()=>zone.classList.remove('dragover'));
+zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('dragover');handleFiles(e.dataTransfer.files);});
+input.addEventListener('change',e=>handleFiles(e.target.files));
+
+function showError(msg){errorMsg.textContent=msg;errorMsg.classList.add('visible');zone.classList.add('has-error');setTimeout(()=>{errorMsg.classList.remove('visible');zone.classList.remove('has-error');},4000);}
+function showToast(msg,type){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast ${type} show`;setTimeout(()=>t.classList.remove('show'),3000);}
+
+function handleFiles(newFiles){
+  const arr=Array.from(newFiles);
+  if(files.length+arr.length>MAX_FILES){showError(`Maximum ${MAX_FILES} files allowed. You have ${files.length}, tried to add ${arr.length}.`);return;}
+  const errors=[];
+  arr.forEach(f=>{
+    if(!ALLOWED_TYPES.includes(f.type)){errors.push(`${f.name}: Invalid file type (${f.type||'unknown'})`);return;}
+    if(f.size>MAX_SIZE){errors.push(`${f.name}: File too large (${(f.size/1024/1024).toFixed(1)}MB > 5MB)`);return;}
+    if(files.find(ex=>ex.name===f.name)){errors.push(`${f.name}: Duplicate file`);return;}
+    files.push({name:f.name,size:f.size,type:f.type,status:'pending',progress:0,file:f,id:`file-${Date.now()}-${Math.random().toString(36).slice(2,6)}`});
+  });
+  if(errors.length)showError(errors.join(' | '));
+  renderFiles();
+}
+
+function renderFiles(){
+  fileList.innerHTML='';
+  files.forEach((f,i)=>{
+    const icon=f.type==='application/pdf'?'📄':f.type.includes('png')?'🖼️':'📸';
+    const el=document.createElement('div');
+    el.className='file-item';el.setAttribute('data-testid',`file-item-${i}`);el.setAttribute('data-filename',f.name);el.setAttribute('data-status',f.status);
+    el.innerHTML=`<div class="file-icon">${icon}</div><div class="file-info"><div class="file-name" data-testid="file-name-${i}">${f.name}</div><div class="file-size" data-testid="file-size-${i}">${(f.size/1024).toFixed(1)} KB</div><div class="progress-bar"><div class="progress-fill" data-testid="progress-${i}" style="width:${f.progress}%"></div></div></div><span class="file-status ${f.status}" data-testid="file-status-${i}">${f.status}</span><button class="file-remove" data-testid="file-remove-${i}" data-index="${i}">✕</button>`;
+    fileList.appendChild(el);
+  });
+  document.querySelectorAll('.file-remove').forEach(btn=>btn.addEventListener('click',e=>{const idx=parseInt(e.target.dataset.index);files.splice(idx,1);renderFiles();}));
+  if(files.length>0){summary.classList.add('visible');document.getElementById('summary-count').textContent=files.length;document.getElementById('summary-size').textContent=`${(files.reduce((a,f)=>a+f.size,0)/1024).toFixed(1)} KB`;document.getElementById('summary-errors').textContent=files.filter(f=>f.status==='error').length;submitBtn.disabled=files.length===0||files.some(f=>f.status==='uploading');}else{summary.classList.remove('visible');}
+}
+
+submitBtn.addEventListener('click',async()=>{
+  submitBtn.disabled=true;
+  for(let i=0;i<files.length;i++){
+    if(files[i].status==='success')continue;
+    files[i].status='uploading';files[i].progress=0;renderFiles();
+    // Simulate upload with progress
+    for(let p=0;p<=100;p+=10){
+      await new Promise(r=>setTimeout(r,150+Math.random()*200));
+      files[i].progress=p;renderFiles();
+    }
+    // 10% chance of upload failure
+    if(Math.random()<0.1){files[i].status='error';files[i].progress=0;showToast(`Failed to upload ${files[i].name}`,'error');}
+    else{files[i].status='success';files[i].progress=100;} renderFiles();
+  }
+  const allSuccess=files.every(f=>f.status==='success');
+  if(allSuccess)showToast('All files uploaded successfully!','success');
+  submitBtn.disabled=false;
+});
+window.__UPLOAD__={getFiles:()=>files,getFileCount:()=>files.length,clearFiles:()=>{files=[];renderFiles();}};
+</script>
+</body>
+</html>

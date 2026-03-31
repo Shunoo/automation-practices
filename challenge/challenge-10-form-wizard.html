@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Challenge 10 — Multi-Step Form Wizard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{--bg:#f0f4f8;--surface:#fff;--border:#d1d9e6;--text:#1a2332;--muted:#7b8a9e;--accent:#4f46e5;--red:#ef4444;--green:#22c55e}
+  body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;justify-content:center;padding:2rem}
+  .container{max-width:550px;width:100%}
+  h1{font-size:1.5rem;font-weight:700;margin-bottom:0.3rem}
+  .subtitle{color:var(--muted);font-size:0.8rem;margin-bottom:2rem}
+  .progress-bar{display:flex;gap:0;margin-bottom:2rem;position:relative}
+  .progress-step{flex:1;text-align:center;position:relative;z-index:1}
+  .step-circle{width:36px;height:36px;border-radius:50%;background:var(--border);color:white;display:flex;align-items:center;justify-content:center;margin:0 auto 0.3rem;font-weight:700;font-size:0.85rem;transition:all 0.3s}
+  .step-circle.active{background:var(--accent)}
+  .step-circle.completed{background:var(--green)}
+  .step-label{font-size:0.7rem;color:var(--muted);font-weight:500}
+  .step-label.active{color:var(--accent);font-weight:700}
+  .progress-line{position:absolute;top:18px;left:0;right:0;height:2px;background:var(--border);z-index:0}
+  .progress-fill-line{height:100%;background:var(--accent);transition:width 0.4s;width:0%}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem}
+  .step-content{display:none}
+  .step-content.active{display:block}
+  .step-title{font-size:1.1rem;font-weight:700;margin-bottom:1.2rem}
+  .form-group{margin-bottom:1rem}
+  .form-group label{display:block;font-size:0.8rem;font-weight:500;color:var(--muted);margin-bottom:0.3rem}
+  .form-group input,.form-group select,.form-group textarea{width:100%;padding:0.6rem 0.8rem;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.9rem;outline:none;transition:border 0.2s}
+  .form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--accent)}
+  .form-group input.error,.form-group select.error{border-color:var(--red)}
+  .error-text{color:var(--red);font-size:0.75rem;margin-top:0.2rem;display:none}
+  .error-text.visible{display:block}
+  .radio-group{display:flex;gap:0.8rem;flex-wrap:wrap}
+  .radio-option{flex:1;min-width:120px}
+  .radio-option input{display:none}
+  .radio-option label{display:block;padding:0.7rem;border:1px solid var(--border);border-radius:8px;text-align:center;cursor:pointer;font-size:0.85rem;font-weight:500;transition:all 0.2s}
+  .radio-option input:checked+label{border-color:var(--accent);background:rgba(79,70,229,0.05);color:var(--accent)}
+  .form-actions{display:flex;justify-content:space-between;margin-top:1.5rem}
+  .btn{padding:0.6rem 1.5rem;border:none;border-radius:8px;cursor:pointer;font-family:inherit;font-weight:600;font-size:0.9rem;transition:all 0.2s}
+  .btn-next{background:var(--accent);color:white}
+  .btn-next:hover{opacity:0.9}
+  .btn-back{background:transparent;color:var(--muted);border:1px solid var(--border)}
+  .btn-back:hover{background:var(--bg)}
+  .btn-submit{background:var(--green);color:white}
+  .btn-submit:hover{opacity:0.9}
+  .review-section{margin-bottom:1rem}
+  .review-label{font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px}
+  .review-value{font-size:0.95rem;font-weight:500;margin-bottom:0.5rem}
+  .success-view{text-align:center;padding:2rem 1rem;display:none}
+  .success-view.visible{display:block}
+  .success-icon{font-size:3rem;margin-bottom:1rem}
+  .success-title{font-size:1.3rem;font-weight:700;margin-bottom:0.5rem}
+  .success-msg{color:var(--muted);font-size:0.9rem}
+  .checkbox-group{display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem}
+  .checkbox-group input{width:18px;height:18px;accent-color:var(--accent)}
+  .checkbox-group label{font-size:0.85rem;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Registration Wizard</h1>
+  <p class="subtitle">Challenge 10 — Multi-step form with per-step validation, back/next, review & submit</p>
+  <div class="progress-bar" data-testid="progress-bar">
+    <div class="progress-line"><div class="progress-fill-line" id="progress-fill" data-testid="progress-fill"></div></div>
+    <div class="progress-step"><div class="step-circle active" data-testid="step-1-circle">1</div><div class="step-label active">Personal</div></div>
+    <div class="progress-step"><div class="step-circle" data-testid="step-2-circle">2</div><div class="step-label">Contact</div></div>
+    <div class="progress-step"><div class="step-circle" data-testid="step-3-circle">3</div><div class="step-label">Preferences</div></div>
+    <div class="progress-step"><div class="step-circle" data-testid="step-4-circle">4</div><div class="step-label">Review</div></div>
+  </div>
+  <div class="card">
+    <!-- STEP 1 -->
+    <div class="step-content active" id="step-1" data-testid="step-1">
+      <div class="step-title">Personal Information</div>
+      <div class="form-group"><label for="first-name">First Name *</label><input type="text" id="first-name" data-testid="first-name" placeholder="John"><div class="error-text" data-testid="error-first-name">First name is required</div></div>
+      <div class="form-group"><label for="last-name">Last Name *</label><input type="text" id="last-name" data-testid="last-name" placeholder="Doe"><div class="error-text" data-testid="error-last-name">Last name is required</div></div>
+      <div class="form-group"><label for="dob">Date of Birth *</label><input type="date" id="dob" data-testid="dob"><div class="error-text" data-testid="error-dob">You must be at least 18 years old</div></div>
+      <div class="form-actions"><div></div><button class="btn btn-next" data-testid="next-1">Next →</button></div>
+    </div>
+    <!-- STEP 2 -->
+    <div class="step-content" id="step-2" data-testid="step-2">
+      <div class="step-title">Contact Details</div>
+      <div class="form-group"><label for="email">Email *</label><input type="email" id="email" data-testid="email" placeholder="john@example.com"><div class="error-text" data-testid="error-email">Valid email is required</div></div>
+      <div class="form-group"><label for="phone">Phone Number *</label><input type="tel" id="phone" data-testid="phone" placeholder="+1 555 000 0000"><div class="error-text" data-testid="error-phone">Valid phone number is required (min 10 digits)</div></div>
+      <div class="form-group"><label for="address">Address</label><textarea id="address" data-testid="address" rows="2" placeholder="123 Main St, City"></textarea></div>
+      <div class="form-actions"><button class="btn btn-back" data-testid="back-2">← Back</button><button class="btn btn-next" data-testid="next-2">Next →</button></div>
+    </div>
+    <!-- STEP 3 -->
+    <div class="step-content" id="step-3" data-testid="step-3">
+      <div class="step-title">Preferences</div>
+      <div class="form-group"><label>Subscription Plan *</label>
+        <div class="radio-group" data-testid="plan-options">
+          <div class="radio-option"><input type="radio" name="plan" value="free" id="plan-free" data-testid="plan-free"><label for="plan-free">Free</label></div>
+          <div class="radio-option"><input type="radio" name="plan" value="pro" id="plan-pro" data-testid="plan-pro"><label for="plan-pro">Pro - $9/mo</label></div>
+          <div class="radio-option"><input type="radio" name="plan" value="enterprise" id="plan-enterprise" data-testid="plan-enterprise"><label for="plan-enterprise">Enterprise</label></div>
+        </div>
+        <div class="error-text" data-testid="error-plan">Please select a plan</div>
+      </div>
+      <div class="form-group"><label>Interests</label>
+        <div class="checkbox-group"><input type="checkbox" id="int-tech" data-testid="interest-tech" value="tech"><label for="int-tech">Technology</label></div>
+        <div class="checkbox-group"><input type="checkbox" id="int-design" data-testid="interest-design" value="design"><label for="int-design">Design</label></div>
+        <div class="checkbox-group"><input type="checkbox" id="int-business" data-testid="interest-business" value="business"><label for="int-business">Business</label></div>
+        <div class="checkbox-group"><input type="checkbox" id="int-science" data-testid="interest-science" value="science"><label for="int-science">Science</label></div>
+      </div>
+      <div class="form-group"><div class="checkbox-group"><input type="checkbox" id="terms" data-testid="terms-checkbox"><label for="terms">I agree to the Terms & Conditions *</label></div><div class="error-text" data-testid="error-terms">You must accept the terms</div></div>
+      <div class="form-actions"><button class="btn btn-back" data-testid="back-3">← Back</button><button class="btn btn-next" data-testid="next-3">Review →</button></div>
+    </div>
+    <!-- STEP 4 REVIEW -->
+    <div class="step-content" id="step-4" data-testid="step-4">
+      <div class="step-title">Review & Submit</div>
+      <div class="review-section"><div class="review-label">Name</div><div class="review-value" id="review-name" data-testid="review-name"></div></div>
+      <div class="review-section"><div class="review-label">Date of Birth</div><div class="review-value" id="review-dob" data-testid="review-dob"></div></div>
+      <div class="review-section"><div class="review-label">Email</div><div class="review-value" id="review-email" data-testid="review-email"></div></div>
+      <div class="review-section"><div class="review-label">Phone</div><div class="review-value" id="review-phone" data-testid="review-phone"></div></div>
+      <div class="review-section"><div class="review-label">Address</div><div class="review-value" id="review-address" data-testid="review-address"></div></div>
+      <div class="review-section"><div class="review-label">Plan</div><div class="review-value" id="review-plan" data-testid="review-plan"></div></div>
+      <div class="review-section"><div class="review-label">Interests</div><div class="review-value" id="review-interests" data-testid="review-interests"></div></div>
+      <div class="form-actions"><button class="btn btn-back" data-testid="back-4">← Edit</button><button class="btn btn-submit" data-testid="submit-btn">Submit ✓</button></div>
+    </div>
+    <!-- SUCCESS -->
+    <div class="success-view" id="success-view" data-testid="success-view">
+      <div class="success-icon">🎉</div>
+      <div class="success-title">Registration Complete!</div>
+      <div class="success-msg" data-testid="success-message">Thank you for registering. Your account has been created.</div>
+      <div id="success-ref" data-testid="success-ref" style="margin-top:1rem;font-size:0.85rem;color:var(--muted)"></div>
+    </div>
+  </div>
+</div>
+<script>
+let currentStep=1;
+function showStep(n){
+  document.querySelectorAll('.step-content').forEach(el=>el.classList.remove('active'));
+  document.getElementById(`step-${n}`).classList.add('active');
+  document.querySelectorAll('.step-circle').forEach((c,i)=>{c.classList.remove('active','completed');if(i+1<n)c.classList.add('completed');if(i+1===n)c.classList.add('active');});
+  document.querySelectorAll('.step-label').forEach((l,i)=>{l.classList.remove('active');if(i===n-1)l.classList.add('active');});
+  document.getElementById('progress-fill').style.width=`${((n-1)/3)*100}%`;
+  currentStep=n;
+}
+function showError(id){const el=document.querySelector(`[data-testid="error-${id}"]`);el.classList.add('visible');document.getElementById(id)?.classList.add('error');}
+function clearErrors(){document.querySelectorAll('.error-text').forEach(e=>e.classList.remove('visible'));document.querySelectorAll('input.error,select.error').forEach(e=>e.classList.remove('error'));}
+
+function validateStep1(){
+  clearErrors();let valid=true;
+  if(!document.getElementById('first-name').value.trim()){showError('first-name');valid=false;}
+  if(!document.getElementById('last-name').value.trim()){showError('last-name');valid=false;}
+  const dob=document.getElementById('dob').value;
+  if(!dob){showError('dob');valid=false;}else{const age=Math.floor((new Date()-new Date(dob))/(365.25*24*60*60*1000));if(age<18){showError('dob');valid=false;}}
+  return valid;
+}
+function validateStep2(){
+  clearErrors();let valid=true;
+  const email=document.getElementById('email').value.trim();
+  if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){showError('email');valid=false;}
+  const phone=document.getElementById('phone').value.replace(/\D/g,'');
+  if(phone.length<10){showError('phone');valid=false;}
+  return valid;
+}
+function validateStep3(){
+  clearErrors();let valid=true;
+  if(!document.querySelector('input[name="plan"]:checked')){showError('plan');valid=false;}
+  if(!document.getElementById('terms').checked){showError('terms');valid=false;}
+  return valid;
+}
+function populateReview(){
+  document.getElementById('review-name').textContent=`${document.getElementById('first-name').value} ${document.getElementById('last-name').value}`;
+  document.getElementById('review-dob').textContent=document.getElementById('dob').value;
+  document.getElementById('review-email').textContent=document.getElementById('email').value;
+  document.getElementById('review-phone').textContent=document.getElementById('phone').value;
+  document.getElementById('review-address').textContent=document.getElementById('address').value||'Not provided';
+  document.getElementById('review-plan').textContent=document.querySelector('input[name="plan"]:checked')?.value||'None';
+  const interests=[...document.querySelectorAll('[data-testid^="interest-"]:checked')].map(c=>c.value);
+  document.getElementById('review-interests').textContent=interests.length?interests.join(', '):'None selected';
+}
+
+document.querySelector('[data-testid="next-1"]').addEventListener('click',()=>{if(validateStep1())showStep(2);});
+document.querySelector('[data-testid="next-2"]').addEventListener('click',()=>{if(validateStep2())showStep(3);});
+document.querySelector('[data-testid="next-3"]').addEventListener('click',()=>{if(validateStep3()){populateReview();showStep(4);}});
+document.querySelector('[data-testid="back-2"]').addEventListener('click',()=>showStep(1));
+document.querySelector('[data-testid="back-3"]').addEventListener('click',()=>showStep(2));
+document.querySelector('[data-testid="back-4"]').addEventListener('click',()=>showStep(3));
+
+document.querySelector('[data-testid="submit-btn"]').addEventListener('click',()=>{
+  const ref=`REG-${Date.now().toString(36).toUpperCase()}`;
+  document.getElementById('success-ref').textContent=`Reference: ${ref}`;
+  document.querySelectorAll('.step-content').forEach(el=>el.classList.remove('active'));
+  document.getElementById('success-view').classList.add('visible');
+  document.querySelectorAll('.step-circle').forEach(c=>{c.classList.remove('active');c.classList.add('completed');});
+  document.getElementById('progress-fill').style.width='100%';
+});
+window.__WIZARD__={getStep:()=>currentStep,getData:()=>({firstName:document.getElementById('first-name').value,lastName:document.getElementById('last-name').value,dob:document.getElementById('dob').value,email:document.getElementById('email').value,phone:document.getElementById('phone').value,address:document.getElementById('address').value,plan:document.querySelector('input[name="plan"]:checked')?.value,interests:[...document.querySelectorAll('[data-testid^="interest-"]:checked')].map(c=>c.value),terms:document.getElementById('terms').checked})};
+</script>
+</body>
+</html>

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Challenge 21 — Error Boundary & Recovery</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:system-ui,sans-serif;background:#fafafa;color:#18181b;padding:2rem;max-width:750px;margin:0 auto}
+  h1{font-size:1.5rem;margin-bottom:0.3rem}
+  .subtitle{color:#a1a1aa;font-size:0.8rem;margin-bottom:2rem}
+  .section{background:#fff;border:1px solid #e4e4e7;border-radius:10px;padding:1.5rem;margin-bottom:1rem}
+  .section h2{font-size:0.8rem;text-transform:uppercase;letter-spacing:1px;color:#a1a1aa;margin-bottom:1rem}
+  .btn{padding:0.5rem 1rem;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.85rem;margin-right:0.5rem;margin-bottom:0.5rem}
+  .btn-danger{background:#ef4444;color:white}.btn-warn{background:#f59e0b;color:white}.btn-primary{background:#3b82f6;color:white}.btn-success{background:#22c55e;color:white}.btn-gray{background:#e4e4e7;color:#18181b}
+  .error-display{margin-top:1rem;padding:1rem;border-radius:8px;font-family:monospace;font-size:0.8rem;display:none}
+  .error-display.visible{display:block}
+  .error-display.error{background:#fef2f2;border:1px solid #fecaca;color:#dc2626}
+  .error-display.recovered{background:#f0fdf4;border:1px solid #bbf7d0;color:#16a34a}
+  .error-display.warning{background:#fffbeb;border:1px solid #fef08a;color:#a16207}
+  .widget{padding:1rem;background:#f4f4f5;border-radius:8px;margin-bottom:0.8rem;position:relative;transition:all 0.3s}
+  .widget.crashed{background:#fef2f2;border:1px solid #fecaca}
+  .widget-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem}
+  .widget-title{font-weight:600;font-size:0.9rem}
+  .widget-status{font-size:0.75rem;padding:0.15rem 0.5rem;border-radius:4px}
+  .widget-status.ok{background:#dcfce7;color:#16a34a}.widget-status.error{background:#fee2e2;color:#dc2626}.widget-status.loading{background:#e0f2fe;color:#0284c7}
+  .widget-content{font-size:0.85rem;color:#52525b;min-height:40px}
+  .retry-btn{margin-top:0.5rem;padding:0.3rem 0.8rem;background:#3b82f6;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.8rem}
+  .crash-overlay{position:absolute;inset:0;background:rgba(254,242,242,0.95);border-radius:8px;display:none;align-items:center;justify-content:center;flex-direction:column;gap:0.5rem;text-align:center;padding:1rem}
+  .crash-overlay.visible{display:flex}
+  .crash-overlay .crash-icon{font-size:2rem}
+  .crash-overlay .crash-msg{font-size:0.85rem;color:#dc2626;font-weight:600}
+  .error-log{max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:0.3rem;margin-top:0.8rem}
+  .log-entry{font-family:monospace;font-size:0.75rem;padding:0.4rem 0.6rem;background:#f4f4f5;border-radius:4px;display:flex;gap:0.5rem}
+  .log-entry .level{font-weight:700;min-width:50px}
+  .log-entry .level.error{color:#dc2626}.log-entry .level.warn{color:#d97706}.log-entry .level.info{color:#2563eb}.log-entry .level.recovery{color:#16a34a}
+  .network-sim{display:flex;gap:0.5rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap}
+  .network-status{font-size:0.8rem;padding:0.3rem 0.8rem;border-radius:6px;font-weight:600}
+  .network-status.online{background:#dcfce7;color:#16a34a}
+  .network-status.offline{background:#fee2e2;color:#dc2626}
+  .network-status.slow{background:#fef9c3;color:#a16207}
+</style>
+</head>
+<body>
+<h1>Error Boundary Lab</h1>
+<p class="subtitle">Challenge 21 — Trigger errors, test recovery flows, validate error states and fallback UIs</p>
+
+<!-- 1. WIDGET CRASH & RECOVERY -->
+<div class="section" data-testid="widget-section">
+  <h2>1. Widget Crash & Recovery</h2>
+  <div class="widget" id="widget-a" data-testid="widget-a">
+    <div class="widget-header"><span class="widget-title">Analytics Widget</span><span class="widget-status ok" id="widget-a-status" data-testid="widget-a-status">OK</span></div>
+    <div class="widget-content" id="widget-a-content" data-testid="widget-a-content">Active users: 2,847 | Page views: 12,391</div>
+    <div class="crash-overlay" id="widget-a-crash" data-testid="widget-a-crash"><div class="crash-icon">💥</div><div class="crash-msg">Widget crashed!</div><button class="retry-btn" data-testid="retry-widget-a">Retry</button></div>
+  </div>
+  <div class="widget" id="widget-b" data-testid="widget-b">
+    <div class="widget-header"><span class="widget-title">Revenue Widget</span><span class="widget-status ok" id="widget-b-status" data-testid="widget-b-status">OK</span></div>
+    <div class="widget-content" id="widget-b-content" data-testid="widget-b-content">Revenue: $84,200 | Orders: 1,234</div>
+    <div class="crash-overlay" id="widget-b-crash" data-testid="widget-b-crash"><div class="crash-icon">💥</div><div class="crash-msg">Widget crashed!</div><button class="retry-btn" data-testid="retry-widget-b">Retry</button></div>
+  </div>
+  <div style="margin-top:0.8rem">
+    <button class="btn btn-danger" data-testid="crash-widget-a">Crash Analytics</button>
+    <button class="btn btn-danger" data-testid="crash-widget-b">Crash Revenue</button>
+    <button class="btn btn-danger" data-testid="crash-all">Crash All</button>
+    <button class="btn btn-success" data-testid="recover-all">Recover All</button>
+  </div>
+</div>
+
+<!-- 2. NETWORK ERROR SIMULATION -->
+<div class="section" data-testid="network-section">
+  <h2>2. Network Error Simulation</h2>
+  <div class="network-sim">
+    <span style="font-size:0.85rem">Network:</span>
+    <button class="btn btn-success" data-testid="net-online" data-net="online">Online</button>
+    <button class="btn btn-warn" data-testid="net-slow" data-net="slow">Slow (5s)</button>
+    <button class="btn btn-danger" data-testid="net-offline" data-net="offline">Offline</button>
+    <span class="network-status online" id="net-status" data-testid="net-status">Online</span>
+  </div>
+  <button class="btn btn-primary" data-testid="fetch-data">Fetch Data</button>
+  <div class="error-display" id="fetch-result" data-testid="fetch-result"></div>
+</div>
+
+<!-- 3. FORM WITH ERROR RECOVERY -->
+<div class="section" data-testid="form-section">
+  <h2>3. Form Submit with Server Errors</h2>
+  <div style="margin-bottom:0.8rem">
+    <input type="text" id="form-input" data-testid="form-input" placeholder="Type anything..." style="width:100%;padding:0.5rem;border:1px solid #e4e4e7;border-radius:6px;font-size:0.9rem;margin-bottom:0.5rem">
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+      <button class="btn btn-primary" data-testid="submit-200">Submit (200 OK)</button>
+      <button class="btn btn-warn" data-testid="submit-400">Submit (400 Bad Request)</button>
+      <button class="btn btn-danger" data-testid="submit-500">Submit (500 Server Error)</button>
+      <button class="btn btn-gray" data-testid="submit-timeout">Submit (Timeout)</button>
+    </div>
+  </div>
+  <div class="error-display" id="form-result" data-testid="form-result"></div>
+</div>
+
+<!-- 4. UNHANDLED EXCEPTION -->
+<div class="section" data-testid="exception-section">
+  <h2>4. Unhandled Exceptions</h2>
+  <p style="font-size:0.85rem;color:#71717a;margin-bottom:0.8rem">These buttons trigger real JS errors. Your test should verify the app handles them gracefully.</p>
+  <button class="btn btn-danger" data-testid="throw-type-error">Throw TypeError</button>
+  <button class="btn btn-danger" data-testid="throw-reference-error">Throw ReferenceError</button>
+  <button class="btn btn-danger" data-testid="throw-promise-reject">Unhandled Promise Rejection</button>
+  <div class="error-display" id="exception-display" data-testid="exception-display"></div>
+</div>
+
+<!-- ERROR LOG -->
+<div class="section" data-testid="error-log-section">
+  <h2>Error Log</h2>
+  <button class="btn btn-gray" data-testid="clear-log">Clear Log</button>
+  <div class="error-log" id="error-log" data-testid="error-log"></div>
+</div>
+
+<script>
+let networkMode='online';const errorLog=[];
+function log(level,msg){
+  errorLog.push({level,msg,time:new Date()});
+  const el=document.createElement('div');el.className='log-entry';el.setAttribute('data-testid','log-entry');el.setAttribute('data-level',level);
+  el.innerHTML=`<span class="level ${level}">${level.toUpperCase()}</span><span>[${new Date().toLocaleTimeString()}] ${msg}</span>`;
+  document.getElementById('error-log').prepend(el);
+}
+
+// 1. Widget crash/recovery
+function crashWidget(id){
+  const w=document.getElementById(`widget-${id}`);const s=document.getElementById(`widget-${id}-status`);const c=document.getElementById(`widget-${id}-crash`);
+  w.classList.add('crashed');s.textContent='Error';s.className='widget-status error';c.classList.add('visible');
+  log('error',`Widget ${id} crashed`);
+}
+function recoverWidget(id){
+  const w=document.getElementById(`widget-${id}`);const s=document.getElementById(`widget-${id}-status`);const c=document.getElementById(`widget-${id}-crash`);
+  w.classList.remove('crashed');s.textContent='OK';s.className='widget-status ok';c.classList.remove('visible');
+  log('recovery',`Widget ${id} recovered`);
+}
+document.querySelector('[data-testid="crash-widget-a"]').addEventListener('click',()=>crashWidget('a'));
+document.querySelector('[data-testid="crash-widget-b"]').addEventListener('click',()=>crashWidget('b'));
+document.querySelector('[data-testid="crash-all"]').addEventListener('click',()=>{crashWidget('a');crashWidget('b');});
+document.querySelector('[data-testid="recover-all"]').addEventListener('click',()=>{recoverWidget('a');recoverWidget('b');});
+document.querySelector('[data-testid="retry-widget-a"]').addEventListener('click',()=>recoverWidget('a'));
+document.querySelector('[data-testid="retry-widget-b"]').addEventListener('click',()=>recoverWidget('b'));
+
+// 2. Network simulation
+document.querySelectorAll('[data-net]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    networkMode=btn.dataset.net;
+    const s=document.getElementById('net-status');
+    s.textContent=networkMode.charAt(0).toUpperCase()+networkMode.slice(1);
+    s.className=`network-status ${networkMode}`;
+    log('info',`Network mode: ${networkMode}`);
+  });
+});
+document.querySelector('[data-testid="fetch-data"]').addEventListener('click',async()=>{
+  const r=document.getElementById('fetch-result');
+  r.className='error-display visible';r.style.display='block';
+  if(networkMode==='offline'){r.className='error-display visible error';r.textContent='NetworkError: Failed to fetch — no internet connection';log('error','Fetch failed: offline');return;}
+  r.className='error-display visible warning';r.textContent='Loading...';
+  const delay=networkMode==='slow'?5000:800;
+  await new Promise(res=>setTimeout(res,delay));
+  r.className='error-display visible recovered';r.textContent=`Success! Data loaded in ${delay}ms. Users: 2847, Revenue: $84,200`;
+  log('info',`Fetch succeeded (${networkMode} mode, ${delay}ms)`);
+});
+
+// 3. Form submit with different responses
+async function submitForm(status){
+  const r=document.getElementById('form-result');const input=document.getElementById('form-input').value;
+  r.className='error-display visible warning';r.textContent='Submitting...';r.style.display='block';
+  await new Promise(res=>setTimeout(res,800));
+  if(status===200){r.className='error-display visible recovered';r.textContent=`200 OK — Form submitted successfully. Input: "${input}"`;r.setAttribute('data-status','200');log('info','Form: 200 OK');}
+  else if(status===400){r.className='error-display visible error';r.textContent=`400 Bad Request — Validation failed: "${input}" is not acceptable.`;r.setAttribute('data-status','400');log('warn','Form: 400 Bad Request');}
+  else if(status===500){r.className='error-display visible error';r.textContent='500 Internal Server Error — Something went wrong on our end. Please try again.';r.setAttribute('data-status','500');log('error','Form: 500 Server Error');}
+  else if(status==='timeout'){r.className='error-display visible warning';r.textContent='Request timed out...';await new Promise(res=>setTimeout(res,6000));r.className='error-display visible error';r.textContent='408 Request Timeout — Server did not respond within 6 seconds.';r.setAttribute('data-status','408');log('error','Form: Timeout');}
+}
+document.querySelector('[data-testid="submit-200"]').addEventListener('click',()=>submitForm(200));
+document.querySelector('[data-testid="submit-400"]').addEventListener('click',()=>submitForm(400));
+document.querySelector('[data-testid="submit-500"]').addEventListener('click',()=>submitForm(500));
+document.querySelector('[data-testid="submit-timeout"]').addEventListener('click',()=>submitForm('timeout'));
+
+// 4. Unhandled exceptions (caught by global handler)
+window.addEventListener('error',e=>{
+  const d=document.getElementById('exception-display');
+  d.className='error-display visible error';d.style.display='block';
+  d.textContent=`Caught: [${e.error?.constructor?.name||'Error'}] ${e.message}`;
+  d.setAttribute('data-error-type',e.error?.constructor?.name||'Error');
+  log('error',`Unhandled: ${e.message}`);
+});
+window.addEventListener('unhandledrejection',e=>{
+  const d=document.getElementById('exception-display');
+  d.className='error-display visible error';d.style.display='block';
+  d.textContent=`Caught Promise Rejection: ${e.reason}`;
+  d.setAttribute('data-error-type','PromiseRejection');
+  log('error',`Promise Rejection: ${e.reason}`);
+});
+document.querySelector('[data-testid="throw-type-error"]').addEventListener('click',()=>{const x=null;x.foo();});
+document.querySelector('[data-testid="throw-reference-error"]').addEventListener('click',()=>{undefinedVariable.doSomething();});
+document.querySelector('[data-testid="throw-promise-reject"]').addEventListener('click',()=>{Promise.reject('Async operation failed unexpectedly');});
+
+document.querySelector('[data-testid="clear-log"]').addEventListener('click',()=>{document.getElementById('error-log').innerHTML='';errorLog.length=0;});
+
+window.__ERRORS__={getLog:()=>errorLog,getNetworkMode:()=>networkMode,isWidgetCrashed:id=>document.getElementById(`widget-${id}`).classList.contains('crashed')};
+</script>
+</body>
+</html>

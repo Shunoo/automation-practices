@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Challenge 20 — Real-Time Chat</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:system-ui,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;display:flex}
+  .sidebar{width:280px;background:#1e293b;border-right:1px solid #334155;display:flex;flex-direction:column}
+  .sidebar-header{padding:1.2rem;border-bottom:1px solid #334155}
+  .sidebar-header h2{font-size:1rem;font-weight:700}
+  .user-status{font-size:0.75rem;color:#22c55e;display:flex;align-items:center;gap:0.3rem;margin-top:0.3rem}
+  .user-status .dot{width:8px;height:8px;border-radius:50%;background:#22c55e}
+  .channel-list{flex:1;overflow-y:auto;padding:0.5rem}
+  .channel{display:flex;align-items:center;gap:0.6rem;padding:0.6rem 0.8rem;border-radius:8px;cursor:pointer;font-size:0.9rem;transition:background 0.15s}
+  .channel:hover{background:#334155}
+  .channel.active{background:#334155}
+  .channel-icon{font-size:1.2rem}
+  .channel-name{flex:1}
+  .channel-unread{background:#ef4444;color:white;font-size:0.65rem;font-weight:700;padding:0.15rem 0.45rem;border-radius:10px;min-width:18px;text-align:center}
+  .online-list{padding:0.8rem;border-top:1px solid #334155}
+  .online-list h3{font-size:0.7rem;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:0.5rem}
+  .online-user{display:flex;align-items:center;gap:0.5rem;padding:0.3rem 0;font-size:0.8rem}
+  .online-dot{width:8px;height:8px;border-radius:50%}
+  .online-dot.online{background:#22c55e}.online-dot.away{background:#f59e0b}.online-dot.offline{background:#64748b}
+  .chat-area{flex:1;display:flex;flex-direction:column}
+  .chat-header{padding:1rem 1.5rem;border-bottom:1px solid #334155;display:flex;justify-content:space-between;align-items:center}
+  .chat-header h2{font-size:1rem;font-weight:600}
+  .chat-header-info{font-size:0.75rem;color:#64748b}
+  .messages{flex:1;overflow-y:auto;padding:1rem 1.5rem;display:flex;flex-direction:column;gap:0.8rem}
+  .message{display:flex;gap:0.6rem;max-width:80%;animation:msgIn 0.3s ease}
+  .message.own{align-self:flex-end;flex-direction:row-reverse}
+  @keyframes msgIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  .msg-avatar{width:32px;height:32px;border-radius:50%;background:#334155;display:flex;align-items:center;justify-content:center;font-size:0.8rem;flex-shrink:0}
+  .msg-content{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:0.6rem 1rem}
+  .message.own .msg-content{background:#3b82f6;border-color:#3b82f6}
+  .msg-author{font-size:0.7rem;font-weight:700;margin-bottom:0.2rem;color:#94a3b8}
+  .message.own .msg-author{color:rgba(255,255,255,0.7)}
+  .msg-text{font-size:0.9rem;line-height:1.4}
+  .msg-time{font-size:0.65rem;color:#64748b;margin-top:0.2rem}
+  .message.own .msg-time{color:rgba(255,255,255,0.5)}
+  .msg-status{font-size:0.6rem;color:#64748b;text-align:right}
+  .typing-indicator{padding:0.3rem 1.5rem;font-size:0.8rem;color:#64748b;min-height:24px}
+  .chat-input{padding:1rem 1.5rem;border-top:1px solid #334155;display:flex;gap:0.5rem}
+  .chat-input input{flex:1;padding:0.6rem 1rem;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-family:inherit;font-size:0.9rem;outline:none}
+  .chat-input input:focus{border-color:#3b82f6}
+  .chat-input button{padding:0.6rem 1.2rem;background:#3b82f6;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:0.9rem}
+  .chat-input button:hover{opacity:0.9}
+  .chat-input button:disabled{opacity:0.4;cursor:not-allowed}
+  .system-msg{text-align:center;font-size:0.8rem;color:#64748b;padding:0.5rem}
+  .emoji-bar{display:flex;gap:0.3rem;padding:0 1.5rem 0.5rem}
+  .emoji-btn{background:none;border:none;font-size:1.2rem;cursor:pointer;padding:0.2rem;border-radius:4px;transition:background 0.15s}
+  .emoji-btn:hover{background:#334155}
+</style>
+</head>
+<body>
+<div class="sidebar" data-testid="sidebar">
+  <div class="sidebar-header">
+    <h2 data-testid="app-title">ChatRoom</h2>
+    <div class="user-status" data-testid="user-status"><div class="dot"></div> <span id="my-username" data-testid="my-username">You</span> — Online</div>
+  </div>
+  <div class="channel-list" data-testid="channel-list">
+    <div class="channel active" data-channel="general" data-testid="channel-general"><span class="channel-icon">#</span><span class="channel-name">general</span><span class="channel-unread" data-testid="unread-general" style="display:none">0</span></div>
+    <div class="channel" data-channel="random" data-testid="channel-random"><span class="channel-icon">#</span><span class="channel-name">random</span><span class="channel-unread" data-testid="unread-random" style="display:none">0</span></div>
+    <div class="channel" data-channel="help" data-testid="channel-help"><span class="channel-icon">#</span><span class="channel-name">help</span><span class="channel-unread" data-testid="unread-help" style="display:none">0</span></div>
+  </div>
+  <div class="online-list" data-testid="online-list">
+    <h3>Online — <span id="online-count" data-testid="online-count">4</span></h3>
+    <div class="online-user" data-testid="user-alice"><div class="online-dot online"></div>Alice</div>
+    <div class="online-user" data-testid="user-bob"><div class="online-dot online"></div>Bob</div>
+    <div class="online-user" data-testid="user-carol"><div class="online-dot away"></div>Carol (away)</div>
+    <div class="online-user" data-testid="user-dave"><div class="online-dot offline"></div>Dave (offline)</div>
+  </div>
+</div>
+
+<div class="chat-area" data-testid="chat-area">
+  <div class="chat-header" data-testid="chat-header">
+    <div><h2 id="channel-title" data-testid="channel-title"># general</h2></div>
+    <div class="chat-header-info" id="channel-info" data-testid="channel-info">3 members</div>
+  </div>
+  <div class="messages" id="messages" data-testid="messages"></div>
+  <div class="typing-indicator" id="typing" data-testid="typing-indicator"></div>
+  <div class="emoji-bar" data-testid="emoji-bar">
+    <button class="emoji-btn" data-emoji="👍" data-testid="emoji-thumbsup">👍</button>
+    <button class="emoji-btn" data-emoji="❤️" data-testid="emoji-heart">❤️</button>
+    <button class="emoji-btn" data-emoji="😂" data-testid="emoji-laugh">😂</button>
+    <button class="emoji-btn" data-emoji="🎉" data-testid="emoji-party">🎉</button>
+    <button class="emoji-btn" data-emoji="🔥" data-testid="emoji-fire">🔥</button>
+  </div>
+  <div class="chat-input" data-testid="chat-input">
+    <input type="text" id="msg-input" data-testid="message-input" placeholder="Type a message..." autocomplete="off">
+    <button id="send-btn" data-testid="send-button">Send</button>
+  </div>
+</div>
+
+<script>
+const channels={general:[],random:[],help:[]};
+let activeChannel='general';let msgIdCounter=1;
+const bots=[
+  {name:'Alice',avatar:'A',responses:['That sounds great!','I agree with that.','Let me check and get back to you.','Good point!','Has anyone tried the new feature?']},
+  {name:'Bob',avatar:'B',responses:['Interesting perspective.','I was just thinking about that.','Can you share more details?','Nice work!','I\'ll look into it.']},
+  {name:'Carol',avatar:'C',responses:['Thanks for sharing!','That\'s helpful.','I have a question about that...','Let\'s discuss this further.','Sounds good to me!']}
+];
+
+function addMessage(channel,author,text,isOwn=false,type='message'){
+  const msg={id:msgIdCounter++,author,text,time:new Date(),isOwn,channel,status:'sent',type};
+  channels[channel].push(msg);
+  if(channel===activeChannel)renderMessages();
+  else{
+    const badge=document.querySelector(`[data-testid="unread-${channel}"]`);
+    const count=parseInt(badge.textContent||0)+1;
+    badge.textContent=count;badge.style.display='inline';
+  }
+  if(isOwn){
+    setTimeout(()=>{msg.status='delivered';if(channel===activeChannel)renderMessages();},500);
+    setTimeout(()=>{msg.status='read';if(channel===activeChannel)renderMessages();},1500);
+  }
+  return msg;
+}
+
+function addSystemMessage(channel,text){
+  addMessage(channel,'System',text,false,'system');
+}
+
+function renderMessages(){
+  const container=document.getElementById('messages');container.innerHTML='';
+  channels[activeChannel].forEach(msg=>{
+    if(msg.type==='system'){
+      const el=document.createElement('div');el.className='system-msg';el.setAttribute('data-testid',`msg-${msg.id}`);el.setAttribute('data-type','system');el.textContent=msg.text;
+      container.appendChild(el);return;
+    }
+    const el=document.createElement('div');el.className=`message${msg.isOwn?' own':''}`;el.setAttribute('data-testid',`msg-${msg.id}`);el.setAttribute('data-author',msg.author);el.setAttribute('data-type','message');
+    const statusIcon=msg.isOwn?`<div class="msg-status" data-testid="msg-status-${msg.id}">${msg.status==='sent'?'Sent':msg.status==='delivered'?'Delivered':'Read'}</div>`:'';
+    el.innerHTML=`<div class="msg-avatar">${msg.author[0]}</div><div class="msg-content"><div class="msg-author" data-testid="msg-author-${msg.id}">${msg.author}</div><div class="msg-text" data-testid="msg-text-${msg.id}">${msg.text}</div><div class="msg-time" data-testid="msg-time-${msg.id}">${msg.time.toLocaleTimeString()}</div>${statusIcon}</div>`;
+    container.appendChild(el);
+  });
+  container.scrollTop=container.scrollHeight;
+}
+
+function simulateTyping(botName){
+  const typing=document.getElementById('typing');
+  typing.textContent=`${botName} is typing...`;typing.setAttribute('data-typing',botName);
+  return new Promise(r=>setTimeout(()=>{typing.textContent='';typing.removeAttribute('data-typing');r();},1500+Math.random()*1500));
+}
+
+async function botReply(channel){
+  const bot=bots[Math.floor(Math.random()*bots.length)];
+  const reply=bot.responses[Math.floor(Math.random()*bot.responses.length)];
+  if(channel===activeChannel)await simulateTyping(bot.name);
+  else await new Promise(r=>setTimeout(r,1500+Math.random()*1500));
+  addMessage(channel,bot.name,reply);
+}
+
+// Send message
+function sendMessage(){
+  const input=document.getElementById('msg-input');
+  const text=input.value.trim();
+  if(!text)return;
+  addMessage(activeChannel,'You',text,true);
+  input.value='';
+  // Bot replies after 1-3s
+  setTimeout(()=>botReply(activeChannel),1000+Math.random()*2000);
+}
+
+document.getElementById('send-btn').addEventListener('click',sendMessage);
+document.getElementById('msg-input').addEventListener('keydown',e=>{if(e.key==='Enter')sendMessage();});
+
+// Emoji buttons
+document.querySelectorAll('.emoji-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const input=document.getElementById('msg-input');
+    input.value+=btn.dataset.emoji;input.focus();
+  });
+});
+
+// Channel switching
+document.querySelectorAll('.channel').forEach(ch=>{
+  ch.addEventListener('click',()=>{
+    document.querySelectorAll('.channel').forEach(c=>c.classList.remove('active'));
+    ch.classList.add('active');
+    activeChannel=ch.dataset.channel;
+    document.getElementById('channel-title').textContent=`# ${activeChannel}`;
+    const badge=document.querySelector(`[data-testid="unread-${activeChannel}"]`);
+    badge.style.display='none';badge.textContent='0';
+    renderMessages();
+  });
+});
+
+// Seed initial messages
+addSystemMessage('general','Welcome to #general! This is the beginning of the conversation.');
+addMessage('general','Alice','Hey everyone! How\'s it going?');
+addMessage('general','Bob','Pretty good! Working on the new dashboard.');
+addSystemMessage('random','Welcome to #random!');
+addMessage('random','Carol','Did anyone see the game last night?');
+addSystemMessage('help','Welcome to #help! Ask your questions here.');
+
+// Background bot activity in other channels
+setInterval(()=>{
+  const otherChannels=Object.keys(channels).filter(c=>c!==activeChannel);
+  if(otherChannels.length&&Math.random()<0.3){
+    const ch=otherChannels[Math.floor(Math.random()*otherChannels.length)];
+    const bot=bots[Math.floor(Math.random()*bots.length)];
+    addMessage(ch,bot.name,bot.responses[Math.floor(Math.random()*bot.responses.length)]);
+  }
+},8000);
+
+renderMessages();
+
+window.__CHAT__={
+  getMessages:ch=>channels[ch||activeChannel],
+  getActiveChannel:()=>activeChannel,
+  getUnread:ch=>{const b=document.querySelector(`[data-testid="unread-${ch}"]`);return parseInt(b.textContent)||0;},
+  sendMessage:(text,ch)=>{const prev=activeChannel;if(ch&&ch!==activeChannel){activeChannel=ch;}addMessage(activeChannel,'You',text,true);activeChannel=prev;},
+  getMessageCount:ch=>(channels[ch||activeChannel]).length,
+  switchChannel:ch=>document.querySelector(`[data-channel="${ch}"]`).click()
+};
+</script>
+</body>
+</html>

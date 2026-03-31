@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Challenge 11 — Notifications & Toasts</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{--bg:#111827;--surface:#1f2937;--border:#374151;--text:#f9fafb;--muted:#9ca3af;--info:#3b82f6;--success:#22c55e;--warning:#f59e0b;--error:#ef4444}
+  body{font-family:'Lexend',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:2rem;display:flex;justify-content:center}
+  .container{max-width:700px;width:100%}
+  h1{font-size:1.5rem;font-weight:700;margin-bottom:0.3rem}
+  .subtitle{color:var(--muted);font-size:0.8rem;margin-bottom:2rem}
+  .trigger-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;margin-bottom:1.5rem}
+  .trigger-panel h2{font-size:0.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:1rem}
+  .trigger-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:0.8rem}
+  .trigger-btn{padding:0.7rem 1rem;border:none;border-radius:8px;cursor:pointer;font-family:inherit;font-weight:500;font-size:0.85rem;color:white;transition:opacity 0.2s}
+  .trigger-btn:hover{opacity:0.9}
+  .trigger-btn.info{background:var(--info)}.trigger-btn.success{background:var(--success)}.trigger-btn.warning{background:var(--warning);color:#111}.trigger-btn.error{background:var(--error)}
+  .trigger-btn.batch{background:var(--border);grid-column:span 2}
+  .config-row{display:flex;gap:1rem;margin-top:1rem;align-items:center;flex-wrap:wrap}
+  .config-row label{font-size:0.8rem;color:var(--muted)}
+  .config-row input,.config-row select{padding:0.4rem 0.6rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;font-size:0.85rem}
+  .notification-center{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem}
+  .nc-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
+  .nc-header h2{font-size:0.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+  .nc-actions{display:flex;gap:0.5rem}
+  .nc-btn{padding:0.3rem 0.8rem;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--muted);cursor:pointer;font-family:inherit;font-size:0.75rem}
+  .nc-btn:hover{border-color:var(--text);color:var(--text)}
+  .nc-count{padding:0.15rem 0.5rem;background:var(--error);color:white;border-radius:10px;font-size:0.7rem;font-weight:700}
+  .notification-list{display:flex;flex-direction:column;gap:0.5rem;max-height:400px;overflow-y:auto}
+  .notification{display:flex;gap:0.8rem;padding:0.8rem;border-radius:8px;background:var(--bg);border:1px solid var(--border);animation:slideIn 0.3s ease;position:relative;transition:all 0.3s}
+  .notification.read{opacity:0.5}
+  .notification.removing{transform:translateX(100%);opacity:0}
+  @keyframes slideIn{from{transform:translateX(-20px);opacity:0}to{transform:translateX(0);opacity:1}}
+  .notif-icon{font-size:1.3rem;flex-shrink:0;margin-top:0.1rem}
+  .notif-body{flex:1}
+  .notif-title{font-weight:600;font-size:0.85rem;margin-bottom:0.2rem}
+  .notif-message{font-size:0.8rem;color:var(--muted);line-height:1.4}
+  .notif-time{font-size:0.7rem;color:var(--muted);margin-top:0.3rem}
+  .notif-actions{display:flex;gap:0.3rem;flex-shrink:0}
+  .notif-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.85rem;padding:0.2rem;border-radius:4px}
+  .notif-btn:hover{color:var(--text);background:var(--border)}
+  .empty-state{text-align:center;padding:2rem;color:var(--muted);font-size:0.9rem;display:none}
+  .empty-state.visible{display:block}
+  /* TOAST CONTAINER */
+  .toast-container{position:fixed;top:1rem;right:1rem;display:flex;flex-direction:column;gap:0.5rem;z-index:1000;max-width:360px}
+  .toast{display:flex;gap:0.6rem;padding:0.8rem 1rem;border-radius:8px;color:white;font-size:0.85rem;animation:toastIn 0.3s ease;align-items:center;box-shadow:0 4px 12px rgba(0,0,0,0.3)}
+  .toast.info{background:var(--info)}.toast.success{background:var(--success)}.toast.warning{background:var(--warning);color:#111}.toast.error{background:var(--error)}
+  @keyframes toastIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+  .toast-progress{position:absolute;bottom:0;left:0;height:3px;background:rgba(255,255,255,0.4);border-radius:0 0 8px 8px}
+  .toast-close{background:none;border:none;color:inherit;cursor:pointer;font-size:1rem;padding:0 0.2rem;opacity:0.7}
+  .toast-close:hover{opacity:1}
+  .toast{position:relative;overflow:hidden}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Notification Center</h1>
+  <p class="subtitle">Challenge 11 — Trigger, dismiss, auto-expire, mark read, batch actions on notifications</p>
+  <div class="trigger-panel" data-testid="trigger-panel">
+    <h2>Trigger Notifications</h2>
+    <div class="trigger-grid">
+      <button class="trigger-btn info" data-type="info" data-testid="trigger-info">ℹ️ Info Notification</button>
+      <button class="trigger-btn success" data-type="success" data-testid="trigger-success">✅ Success Notification</button>
+      <button class="trigger-btn warning" data-type="warning" data-testid="trigger-warning">⚠️ Warning Notification</button>
+      <button class="trigger-btn error" data-type="error" data-testid="trigger-error">❌ Error Notification</button>
+      <button class="trigger-btn batch" data-testid="trigger-batch">🔔 Trigger 5 Random Notifications</button>
+    </div>
+    <div class="config-row">
+      <label>Auto-dismiss after:</label>
+      <input type="number" id="auto-dismiss" data-testid="auto-dismiss-input" value="5" min="1" max="30" style="width:60px"> <span style="font-size:0.8rem;color:var(--muted)">seconds</span>
+      <label style="margin-left:1rem"><input type="checkbox" id="show-toast" data-testid="show-toast-toggle" checked> Show Toast</label>
+    </div>
+  </div>
+  <div class="notification-center" data-testid="notification-center">
+    <div class="nc-header">
+      <h2>Notifications <span class="nc-count" id="unread-count" data-testid="unread-count">0</span></h2>
+      <div class="nc-actions">
+        <button class="nc-btn" id="mark-all-read" data-testid="mark-all-read">Mark All Read</button>
+        <button class="nc-btn" id="dismiss-all" data-testid="dismiss-all">Dismiss All</button>
+      </div>
+    </div>
+    <div class="notification-list" id="notification-list" data-testid="notification-list"></div>
+    <div class="empty-state visible" id="empty-state" data-testid="empty-state">No notifications yet</div>
+  </div>
+</div>
+<div class="toast-container" id="toast-container" data-testid="toast-container"></div>
+<script>
+const types={info:{icon:'ℹ️',titles:['System Update','New Feature','Tip of the Day']},success:{icon:'✅',titles:['Task Completed','Payment Received','Profile Updated']},warning:{icon:'⚠️',titles:['Low Storage','Session Expiring','Rate Limit Warning']},error:{icon:'❌',titles:['Connection Failed','Upload Error','Sync Failed']}};
+const messages={info:['A new version is available. Please refresh.','Check out the new dashboard features.','Did you know you can use keyboard shortcuts?'],success:['Your task has been completed successfully.','Payment of $49.99 was processed.','Your profile changes have been saved.'],warning:['You are using 90% of your storage quota.','Your session will expire in 5 minutes.','You are approaching the API rate limit.'],error:['Could not connect to the server. Retrying...','File upload failed. Please try again.','Data sync failed. Check your connection.']};
+let notifications=[];let nextId=1;
+function addNotification(type){
+  const t=types[type];const title=t.titles[Math.floor(Math.random()*t.titles.length)];const msg=messages[type][Math.floor(Math.random()*messages[type].length)];
+  const notif={id:nextId++,type,icon:t.icon,title,message:msg,time:new Date(),read:false};
+  notifications.unshift(notif);renderNotifications();
+  if(document.getElementById('show-toast').checked)showToast(notif);
+  const autoDismiss=parseInt(document.getElementById('auto-dismiss').value)*1000;
+  if(autoDismiss>0){setTimeout(()=>{const n=notifications.find(x=>x.id===notif.id);if(n)dismissNotification(notif.id);},autoDismiss);}
+  return notif;
+}
+function dismissNotification(id){
+  const el=document.querySelector(`[data-notif-id="${id}"]`);
+  if(el){el.classList.add('removing');setTimeout(()=>{notifications=notifications.filter(n=>n.id!==id);renderNotifications();},300);}
+  else{notifications=notifications.filter(n=>n.id!==id);renderNotifications();}
+}
+function markRead(id){const n=notifications.find(x=>x.id===id);if(n){n.read=true;renderNotifications();}}
+function renderNotifications(){
+  const list=document.getElementById('notification-list');list.innerHTML='';
+  if(notifications.length===0){document.getElementById('empty-state').classList.add('visible');document.getElementById('unread-count').textContent='0';return;}
+  document.getElementById('empty-state').classList.remove('visible');
+  const unread=notifications.filter(n=>!n.read).length;document.getElementById('unread-count').textContent=unread;
+  notifications.forEach(n=>{
+    const el=document.createElement('div');el.className=`notification${n.read?' read':''}`;el.setAttribute('data-notif-id',n.id);el.setAttribute('data-testid',`notification-${n.id}`);el.setAttribute('data-type',n.type);el.setAttribute('data-read',n.read);
+    el.innerHTML=`<div class="notif-icon">${n.icon}</div><div class="notif-body"><div class="notif-title" data-testid="notif-title-${n.id}">${n.title}</div><div class="notif-message" data-testid="notif-message-${n.id}">${n.message}</div><div class="notif-time" data-testid="notif-time-${n.id}">${n.time.toLocaleTimeString()}</div></div><div class="notif-actions"><button class="notif-btn" data-testid="mark-read-${n.id}" title="Mark read">👁</button><button class="notif-btn" data-testid="dismiss-${n.id}" title="Dismiss">✕</button></div>`;
+    el.querySelector(`[data-testid="dismiss-${n.id}"]`).addEventListener('click',()=>dismissNotification(n.id));
+    el.querySelector(`[data-testid="mark-read-${n.id}"]`).addEventListener('click',()=>markRead(n.id));
+    list.appendChild(el);
+  });
+}
+function showToast(notif){
+  const container=document.getElementById('toast-container');
+  const el=document.createElement('div');el.className=`toast ${notif.type}`;el.setAttribute('data-testid',`toast-${notif.id}`);
+  el.innerHTML=`<span>${notif.icon}</span><span style="flex:1">${notif.title}</span><button class="toast-close" data-testid="toast-close-${notif.id}">✕</button><div class="toast-progress" style="animation:shrink ${parseInt(document.getElementById('auto-dismiss').value)}s linear forwards"></div>`;
+  el.querySelector('.toast-close').addEventListener('click',()=>el.remove());
+  container.appendChild(el);
+  setTimeout(()=>el.remove(),parseInt(document.getElementById('auto-dismiss').value)*1000);
+}
+document.querySelectorAll('.trigger-btn[data-type]').forEach(btn=>btn.addEventListener('click',()=>addNotification(btn.dataset.type)));
+document.querySelector('[data-testid="trigger-batch"]').addEventListener('click',()=>{const ts=['info','success','warning','error'];for(let i=0;i<5;i++)setTimeout(()=>addNotification(ts[Math.floor(Math.random()*ts.length)]),i*300);});
+document.getElementById('mark-all-read').addEventListener('click',()=>{notifications.forEach(n=>n.read=true);renderNotifications();});
+document.getElementById('dismiss-all').addEventListener('click',()=>{notifications=[];renderNotifications();document.getElementById('toast-container').innerHTML='';});
+window.__NOTIF__={getAll:()=>notifications,getUnread:()=>notifications.filter(n=>!n.read).length,getById:id=>notifications.find(n=>n.id===id),add:type=>addNotification(type)};
+</script>
+<style>@keyframes shrink{from{width:100%}to{width:0%}}</style>
+</body>
+</html>

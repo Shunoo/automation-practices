@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Challenge 3 — ShopSync Multi-Tab</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #f5f0eb;
+    --surface: #ffffff;
+    --border: #e0dbd4;
+    --text: #2c2925;
+    --muted: #9a9490;
+    --accent: #3d5a80;
+    --cart-color: #ee6c4d;
+    --success: #4a9e6e;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 1.5rem;
+  }
+
+  .top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--text);
+  }
+
+  .logo {
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+
+  .logo span { color: var(--accent); }
+
+  .cart-badge-container {
+    position: relative;
+    cursor: pointer;
+  }
+
+  .cart-icon {
+    font-size: 1.5rem;
+    position: relative;
+  }
+
+  .cart-badge {
+    position: absolute;
+    top: -8px;
+    right: -10px;
+    background: var(--cart-color);
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 700;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Mono', monospace;
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+
+  .cart-badge.bump {
+    transform: scale(1.4);
+  }
+
+  .tab-info {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--muted);
+    background: var(--surface);
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  .page-title {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--muted);
+    margin-bottom: 1rem;
+  }
+
+  /* PRODUCT LISTING */
+  .product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1.2rem;
+  }
+
+  .product-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .product-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  }
+
+  .product-img {
+    height: 160px;
+    background: linear-gradient(135deg, var(--accent), #98c1d9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+  }
+
+  .product-info {
+    padding: 1rem;
+  }
+
+  .product-name {
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 0.3rem;
+  }
+
+  .product-price {
+    font-family: 'Space Mono', monospace;
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 1.1rem;
+    margin-bottom: 0.8rem;
+  }
+
+  .product-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .btn {
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+
+  .btn-cart {
+    background: var(--cart-color);
+    color: white;
+    flex: 1;
+  }
+
+  .btn-cart:hover { opacity: 0.9; }
+  .btn-cart:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-detail {
+    background: var(--text);
+    color: white;
+    flex: 1;
+  }
+
+  .btn-detail:hover { opacity: 0.85; }
+
+  /* PRODUCT DETAIL PAGE */
+  .detail-view {
+    display: none;
+  }
+
+  .detail-view.active { display: block; }
+  .listing-view.hidden { display: none; }
+
+  .detail-hero {
+    height: 250px;
+    background: linear-gradient(135deg, var(--accent), #98c1d9);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .detail-name {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .detail-price {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.5rem;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 1rem;
+  }
+
+  .detail-desc {
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+  }
+
+  .detail-actions {
+    display: flex;
+    gap: 0.8rem;
+  }
+
+  .detail-actions .btn { padding: 0.7rem 2rem; font-size: 1rem; }
+
+  .btn-back {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  /* Cart sidebar */
+  .cart-panel {
+    display: none;
+    position: fixed;
+    right: 0; top: 0; bottom: 0;
+    width: 350px;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    padding: 1.5rem;
+    z-index: 50;
+    box-shadow: -4px 0 24px rgba(0,0,0,0.1);
+  }
+
+  .cart-panel.open { display: block; }
+
+  .cart-panel h2 {
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .cart-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+  }
+
+  .cart-item-price {
+    font-family: 'Space Mono', monospace;
+    font-weight: 700;
+  }
+
+  .cart-total {
+    margin-top: 1rem;
+    font-weight: 700;
+    font-size: 1.1rem;
+    text-align: right;
+  }
+
+  .cart-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: none;
+    border: none;
+    font-size: 1.3rem;
+    cursor: pointer;
+    color: var(--muted);
+  }
+
+  /* Sync log */
+  .sync-log {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    max-width: 300px;
+    z-index: 60;
+  }
+
+  .sync-notification {
+    background: var(--text);
+    color: white;
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-family: 'Space Mono', monospace;
+    margin-top: 0.4rem;
+    animation: slideIn 0.3s ease, fadeOut 0.5s 2.5s forwards;
+  }
+
+  @keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  @keyframes fadeOut {
+    to { opacity: 0; transform: translateY(10px); }
+  }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div class="logo">Shop<span>Sync</span></div>
+  <div style="display: flex; align-items: center; gap: 1rem;">
+    <div class="tab-info" data-testid="tab-id">Tab: <span id="tab-id-display">—</span></div>
+    <div class="cart-badge-container" id="cart-toggle" data-testid="cart-toggle">
+      <span class="cart-icon">🛒</span>
+      <span class="cart-badge" id="cart-badge" data-testid="cart-badge">0</span>
+    </div>
+  </div>
+</div>
+
+<!-- LISTING VIEW -->
+<div class="listing-view" id="listing-view" data-testid="listing-view">
+  <div class="page-title">All Products</div>
+  <div class="product-grid" id="product-grid" data-testid="product-grid"></div>
+</div>
+
+<!-- DETAIL VIEW -->
+<div class="detail-view" id="detail-view" data-testid="detail-view">
+  <div class="detail-hero" id="detail-emoji"></div>
+  <div class="detail-name" id="detail-name" data-testid="detail-name"></div>
+  <div class="detail-price" id="detail-price" data-testid="detail-price"></div>
+  <div class="detail-desc" id="detail-desc" data-testid="detail-desc"></div>
+  <div class="detail-actions">
+    <button class="btn btn-cart" id="detail-add-cart" data-testid="detail-add-to-cart">Add to Cart</button>
+    <button class="btn btn-back" id="detail-back" data-testid="detail-back">← Back</button>
+  </div>
+</div>
+
+<!-- CART PANEL -->
+<div class="cart-panel" id="cart-panel" data-testid="cart-panel">
+  <button class="cart-close" id="cart-close">✕</button>
+  <h2>Your Cart</h2>
+  <div id="cart-items" data-testid="cart-items"></div>
+  <div class="cart-total" id="cart-total" data-testid="cart-total">Total: $0.00</div>
+</div>
+
+<!-- SYNC NOTIFICATIONS -->
+<div class="sync-log" id="sync-log" data-testid="sync-log"></div>
+
+<script>
+  // --- PRODUCTS ---
+  const products = [
+    { id: 1, name: 'Wireless Headphones', price: 79.99, emoji: '🎧', desc: 'Premium noise-cancelling wireless headphones with 30hr battery life.' },
+    { id: 2, name: 'Mechanical Keyboard', price: 149.99, emoji: '⌨️', desc: 'Cherry MX Blue switches, RGB backlight, aluminum frame.' },
+    { id: 3, name: 'Smart Watch', price: 299.99, emoji: '⌚', desc: 'Health tracking, GPS, 5-day battery, water resistant to 50m.' },
+    { id: 4, name: 'USB-C Hub', price: 49.99, emoji: '🔌', desc: '7-in-1 hub: HDMI, 3x USB-A, SD, microSD, USB-C PD.' },
+    { id: 5, name: 'Webcam 4K', price: 129.99, emoji: '📷', desc: '4K resolution, auto-focus, built-in ring light, privacy shutter.' },
+    { id: 6, name: 'Desk Lamp', price: 59.99, emoji: '💡', desc: 'Adjustable color temperature, wireless charging base, touch controls.' },
+  ];
+
+  // --- TAB ID ---
+  const tabId = `tab-${Date.now().toString(36).slice(-4)}`;
+  document.getElementById('tab-id-display').textContent = tabId;
+
+  // --- SHARED CART (via BroadcastChannel + localStorage) ---
+  let cart = JSON.parse(localStorage.getItem('shopsync_cart') || '[]');
+  const channel = new BroadcastChannel('shopsync_cart_channel');
+
+  function saveCart() {
+    localStorage.setItem('shopsync_cart', JSON.stringify(cart));
+  }
+
+  function broadcastCart(action, product) {
+    channel.postMessage({
+      type: 'cart_update',
+      cart: cart,
+      action: action,
+      product: product,
+      sourceTab: tabId,
+      timestamp: Date.now()
+    });
+  }
+
+  // Listen for cart updates from other tabs
+  channel.onmessage = (event) => {
+    if (event.data.type === 'cart_update' && event.data.sourceTab !== tabId) {
+      cart = event.data.cart;
+      updateCartUI();
+      showSyncNotification(`Cart synced: ${event.data.action} "${event.data.product}" from ${event.data.sourceTab}`);
+    }
+  };
+
+  function addToCart(productId) {
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+
+    cart.push({ ...product, addedAt: Date.now(), addedBy: tabId });
+    saveCart();
+    updateCartUI();
+    broadcastCart('added', product.name);
+
+    // Bump animation
+    const badge = document.getElementById('cart-badge');
+    badge.classList.add('bump');
+    setTimeout(() => badge.classList.remove('bump'), 300);
+  }
+
+  function updateCartUI() {
+    const badge = document.getElementById('cart-badge');
+    badge.textContent = cart.length;
+
+    const cartItems = document.getElementById('cart-items');
+    cartItems.innerHTML = cart.map(item => `
+      <div class="cart-item" data-testid="cart-item">
+        <span>${item.emoji} ${item.name}</span>
+        <span class="cart-item-price">$${item.price.toFixed(2)}</span>
+      </div>
+    `).join('');
+
+    const total = cart.reduce((sum, item) => sum + item.price, 0);
+    document.getElementById('cart-total').textContent = `Total: $${total.toFixed(2)}`;
+  }
+
+  function showSyncNotification(msg) {
+    const log = document.getElementById('sync-log');
+    const el = document.createElement('div');
+    el.className = 'sync-notification';
+    el.textContent = msg;
+    el.setAttribute('data-testid', 'sync-notification');
+    log.appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+  }
+
+  // --- RENDER PRODUCTS ---
+  const grid = document.getElementById('product-grid');
+  products.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'product-card';
+    card.setAttribute('data-testid', `product-card-${p.id}`);
+    card.innerHTML = `
+      <div class="product-img">${p.emoji}</div>
+      <div class="product-info">
+        <div class="product-name" data-testid="product-name">${p.name}</div>
+        <div class="product-price" data-testid="product-price">$${p.price.toFixed(2)}</div>
+        <div class="product-actions">
+          <button class="btn btn-cart add-cart-btn" data-id="${p.id}" data-testid="add-to-cart-${p.id}">Add to Cart</button>
+          <button class="btn btn-detail detail-btn" data-id="${p.id}" data-testid="view-detail-${p.id}">Details</button>
+        </div>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+
+  // --- EVENT HANDLERS ---
+  grid.addEventListener('click', (e) => {
+    const addBtn = e.target.closest('.add-cart-btn');
+    const detailBtn = e.target.closest('.detail-btn');
+
+    if (addBtn) {
+      addToCart(parseInt(addBtn.dataset.id));
+    }
+
+    if (detailBtn) {
+      showDetail(parseInt(detailBtn.dataset.id));
+    }
+  });
+
+  function showDetail(productId) {
+    const p = products.find(pr => pr.id === productId);
+    if (!p) return;
+
+    document.getElementById('detail-emoji').textContent = p.emoji;
+    document.getElementById('detail-name').textContent = p.name;
+    document.getElementById('detail-price').textContent = `$${p.price.toFixed(2)}`;
+    document.getElementById('detail-desc').textContent = p.desc;
+    document.getElementById('detail-add-cart').onclick = () => addToCart(p.id);
+
+    document.getElementById('listing-view').classList.add('hidden');
+    document.getElementById('detail-view').classList.add('active');
+
+    // Update URL for testability
+    history.pushState({ productId: p.id }, '', `?product=${p.id}`);
+  }
+
+  document.getElementById('detail-back').addEventListener('click', () => {
+    document.getElementById('listing-view').classList.remove('hidden');
+    document.getElementById('detail-view').classList.remove('active');
+    history.pushState({}, '', window.location.pathname);
+  });
+
+  // Cart toggle
+  document.getElementById('cart-toggle').addEventListener('click', () => {
+    document.getElementById('cart-panel').classList.toggle('open');
+  });
+
+  document.getElementById('cart-close').addEventListener('click', () => {
+    document.getElementById('cart-panel').classList.remove('open');
+  });
+
+  // Handle URL params (for opening product in new tab)
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('product')) {
+    showDetail(parseInt(params.get('product')));
+  }
+
+  // Init cart UI
+  updateCartUI();
+
+  // --- EXPOSE FOR TESTING ---
+  window.__SHOP__ = {
+    getCart: () => cart,
+    getTabId: () => tabId,
+    getCartCount: () => cart.length,
+    clearCart: () => { cart = []; saveCart(); updateCartUI(); broadcastCart('cleared', 'all'); }
+  };
+</script>
+</body>
+</html>

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Challenge 9 — Date Picker & Booking</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{--bg:#fefce8;--surface:#fff;--border:#e5e7eb;--text:#1f2937;--muted:#9ca3af;--accent:#d97706;--accent-light:#fef3c7;--booked:#fee2e2;--booked-text:#dc2626;--selected:#d97706;--range:#fef3c7;--disabled:#f3f4f6}
+  body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;justify-content:center;padding:2rem}
+  .container{max-width:500px;width:100%}
+  h1{font-size:1.5rem;font-weight:800;margin-bottom:0.3rem}
+  .subtitle{color:var(--muted);font-size:0.8rem;margin-bottom:2rem}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;margin-bottom:1rem}
+  .card h2{font-size:0.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:1rem}
+  .cal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
+  .cal-title{font-weight:700;font-size:1.1rem}
+  .cal-nav{display:flex;gap:0.5rem}
+  .cal-nav button{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center}
+  .cal-nav button:hover{background:var(--accent-light)}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+  .cal-day-name{font-size:0.7rem;font-weight:700;color:var(--muted);padding:0.5rem 0;text-transform:uppercase}
+  .cal-day{padding:0.6rem 0;border-radius:8px;font-size:0.85rem;cursor:pointer;transition:all 0.15s;font-weight:600;position:relative}
+  .cal-day:hover:not(.disabled):not(.booked){background:var(--accent-light)}
+  .cal-day.today{border:2px solid var(--accent)}
+  .cal-day.selected{background:var(--selected);color:white}
+  .cal-day.in-range{background:var(--range)}
+  .cal-day.range-start{background:var(--selected);color:white;border-radius:8px 0 0 8px}
+  .cal-day.range-end{background:var(--selected);color:white;border-radius:0 8px 8px 0}
+  .cal-day.booked{background:var(--booked);color:var(--booked-text);cursor:not-allowed;text-decoration:line-through}
+  .cal-day.disabled{color:var(--muted);opacity:0.3;cursor:not-allowed}
+  .cal-day.empty{cursor:default}
+  .booking-info{display:flex;flex-direction:column;gap:0.6rem}
+  .info-row{display:flex;justify-content:space-between;font-size:0.9rem}
+  .info-label{color:var(--muted)}
+  .info-value{font-weight:700}
+  .info-value.placeholder{color:var(--muted);font-weight:400;font-style:italic}
+  .legend{display:flex;gap:1rem;margin-top:1rem;flex-wrap:wrap}
+  .legend-item{display:flex;align-items:center;gap:0.3rem;font-size:0.75rem;color:var(--muted)}
+  .legend-dot{width:14px;height:14px;border-radius:4px}
+  .confirm-btn{width:100%;padding:0.7rem;background:var(--accent);color:white;border:none;border-radius:8px;font-family:inherit;font-weight:700;font-size:0.9rem;cursor:pointer;margin-top:1rem;transition:opacity 0.2s}
+  .confirm-btn:disabled{opacity:0.4;cursor:not-allowed}
+  .toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(100px);padding:0.8rem 1.5rem;border-radius:8px;background:#065f46;color:white;font-weight:600;font-size:0.85rem;opacity:0;transition:all 0.3s}
+  .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Book Your Stay</h1>
+  <p class="subtitle">Challenge 9 — Select date range, handle booked dates, validate booking</p>
+  <div class="card">
+    <h2>Select Dates</h2>
+    <div class="cal-header">
+      <button class="cal-nav" id="prev-month" data-testid="prev-month"><button>‹</button></button>
+      <div class="cal-title" id="cal-title" data-testid="cal-title"></div>
+      <button class="cal-nav" id="next-month" data-testid="next-month"><button>›</button></button>
+    </div>
+    <div class="cal-grid" id="cal-grid" data-testid="cal-grid">
+      <div class="cal-day-name">Sun</div><div class="cal-day-name">Mon</div><div class="cal-day-name">Tue</div><div class="cal-day-name">Wed</div><div class="cal-day-name">Thu</div><div class="cal-day-name">Fri</div><div class="cal-day-name">Sat</div>
+    </div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div>Selected</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--range)"></div>Range</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--booked)"></div>Booked</div>
+      <div class="legend-item"><div class="legend-dot" style="border:2px solid var(--accent)"></div>Today</div>
+    </div>
+  </div>
+  <div class="card" data-testid="booking-summary">
+    <h2>Booking Summary</h2>
+    <div class="booking-info">
+      <div class="info-row"><span class="info-label">Check-in:</span><span class="info-value" id="checkin-display" data-testid="checkin-display">Select a date</span></div>
+      <div class="info-row"><span class="info-label">Check-out:</span><span class="info-value" id="checkout-display" data-testid="checkout-display">Select a date</span></div>
+      <div class="info-row"><span class="info-label">Nights:</span><span class="info-value" id="nights-display" data-testid="nights-display">—</span></div>
+      <div class="info-row"><span class="info-label">Price/night:</span><span class="info-value">$120</span></div>
+      <div class="info-row" style="border-top:1px solid var(--border);padding-top:0.5rem;margin-top:0.3rem"><span class="info-label" style="font-weight:700;color:var(--text)">Total:</span><span class="info-value" id="total-display" data-testid="total-display">$0</span></div>
+    </div>
+    <button class="confirm-btn" id="confirm-btn" data-testid="confirm-button" disabled>Confirm Booking</button>
+    <div id="booking-error" data-testid="booking-error" style="color:var(--booked-text);font-size:0.8rem;margin-top:0.5rem;display:none"></div>
+  </div>
+</div>
+<div class="toast" id="toast" data-testid="toast"></div>
+<script>
+const PRICE=120;
+const today=new Date();today.setHours(0,0,0,0);
+let viewMonth=today.getMonth();let viewYear=today.getFullYear();
+let checkin=null;let checkout=null;
+// Booked dates (blocked)
+const bookedDates=new Set();
+[3,4,5,14,15,16,17,25,26].forEach(d=>bookedDates.add(`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`));
+[7,8,9,10,20,21,22].forEach(d=>bookedDates.add(`${today.getFullYear()}-${String(today.getMonth()+2).padStart(2,'0')}-${String(d).padStart(2,'0')}`));
+
+function dateKey(y,m,d){return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;}
+function isBooked(y,m,d){return bookedDates.has(dateKey(y,m,d));}
+function isPast(y,m,d){const dt=new Date(y,m,d);return dt<today;}
+function isToday(y,m,d){return y===today.getFullYear()&&m===today.getMonth()&&d===today.getDate();}
+function formatDate(dt){return dt?dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'Select a date';}
+
+function hasBookedInRange(start,end){
+  const d=new Date(start);while(d<=end){if(bookedDates.has(dateKey(d.getFullYear(),d.getMonth(),d.getDate())))return true;d.setDate(d.getDate()+1);}return false;
+}
+
+function renderCalendar(){
+  const grid=document.getElementById('cal-grid');
+  grid.querySelectorAll('.cal-day').forEach(el=>el.remove());
+  document.getElementById('cal-title').textContent=new Date(viewYear,viewMonth).toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  const firstDay=new Date(viewYear,viewMonth,1).getDay();
+  const daysInMonth=new Date(viewYear,viewMonth+1,0).getDate();
+  for(let i=0;i<firstDay;i++){const el=document.createElement('div');el.className='cal-day empty';grid.appendChild(el);}
+  for(let d=1;d<=daysInMonth;d++){
+    const el=document.createElement('div');el.className='cal-day';
+    el.textContent=d;el.setAttribute('data-testid',`day-${d}`);el.setAttribute('data-date',dateKey(viewYear,viewMonth,d));
+    if(isPast(viewYear,viewMonth,d)){el.classList.add('disabled');}
+    else if(isBooked(viewYear,viewMonth,d)){el.classList.add('booked');el.setAttribute('data-booked','true');}
+    else{
+      if(isToday(viewYear,viewMonth,d))el.classList.add('today');
+      const dt=new Date(viewYear,viewMonth,d);
+      if(checkin&&checkout){
+        if(dt.getTime()===checkin.getTime())el.classList.add('range-start','selected');
+        else if(dt.getTime()===checkout.getTime())el.classList.add('range-end','selected');
+        else if(dt>checkin&&dt<checkout)el.classList.add('in-range');
+      }else if(checkin&&dt.getTime()===checkin.getTime()){el.classList.add('selected');}
+      el.addEventListener('click',()=>selectDate(viewYear,viewMonth,d));
+    }
+    grid.appendChild(el);
+  }
+}
+
+function selectDate(y,m,d){
+  const dt=new Date(y,m,d);const err=document.getElementById('booking-error');err.style.display='none';
+  if(!checkin||checkout){checkin=dt;checkout=null;}
+  else{
+    if(dt<=checkin){checkin=dt;checkout=null;}
+    else{
+      if(hasBookedInRange(checkin,dt)){err.textContent='Selected range contains booked dates. Please choose another range.';err.style.display='block';return;}
+      checkout=dt;
+    }
+  }
+  updateSummary();renderCalendar();
+}
+
+function updateSummary(){
+  document.getElementById('checkin-display').textContent=formatDate(checkin);document.getElementById('checkin-display').className=checkin?'info-value':'info-value placeholder';
+  document.getElementById('checkout-display').textContent=formatDate(checkout);document.getElementById('checkout-display').className=checkout?'info-value':'info-value placeholder';
+  if(checkin&&checkout){const nights=Math.round((checkout-checkin)/(1000*60*60*24));document.getElementById('nights-display').textContent=nights;document.getElementById('total-display').textContent=`$${nights*PRICE}`;document.getElementById('confirm-btn').disabled=false;}
+  else{document.getElementById('nights-display').textContent='—';document.getElementById('total-display').textContent='$0';document.getElementById('confirm-btn').disabled=true;}
+}
+
+document.querySelector('#prev-month button').addEventListener('click',()=>{viewMonth--;if(viewMonth<0){viewMonth=11;viewYear--;}renderCalendar();});
+document.querySelector('#next-month button').addEventListener('click',()=>{viewMonth++;if(viewMonth>11){viewMonth=0;viewYear++;}renderCalendar();});
+document.getElementById('confirm-btn').addEventListener('click',()=>{
+  if(!checkin||!checkout)return;
+  const t=document.getElementById('toast');t.textContent=`✅ Booked: ${formatDate(checkin)} — ${formatDate(checkout)}`;t.classList.add('show');
+  // Block the dates
+  const d=new Date(checkin);while(d<=checkout){bookedDates.add(dateKey(d.getFullYear(),d.getMonth(),d.getDate()));d.setDate(d.getDate()+1);}
+  checkin=null;checkout=null;updateSummary();renderCalendar();
+  setTimeout(()=>t.classList.remove('show'),3000);
+});
+renderCalendar();
+window.__BOOKING__={getCheckin:()=>checkin,getCheckout:()=>checkout,getBookedDates:()=>[...bookedDates],isDateBooked:(y,m,d)=>isBooked(y,m,d)};
+</script>
+</body>
+</html>

@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Challenge 4 — Visual Regression Dashboard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0f0f12;
+    --surface: #1a1a21;
+    --surface-2: #22222b;
+    --border: #2e2e38;
+    --text: #ececf1;
+    --muted: #6e6e80;
+    --blue: #5b8def;
+    --purple: #a78bfa;
+    --pink: #f472b6;
+    --green: #34d399;
+    --orange: #fb923c;
+    --chart-line: #5b8def;
+    --chart-area: rgba(91, 141, 239, 0.15);
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 1.5rem;
+  }
+
+  .dash-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+  }
+
+  .dash-header h1 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+
+  .dash-header h1 span { color: var(--blue); }
+
+  .header-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .period-btn {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.75rem;
+    padding: 0.35rem 0.8rem;
+    background: var(--surface);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .period-btn.active {
+    background: var(--blue);
+    color: white;
+    border-color: var(--blue);
+  }
+
+  /* KPI Cards */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+  }
+
+  .kpi-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+
+  .kpi-value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    font-family: 'Fira Code', monospace;
+  }
+
+  .kpi-change {
+    font-size: 0.8rem;
+    font-family: 'Fira Code', monospace;
+    margin-top: 0.3rem;
+  }
+
+  .kpi-change.up { color: var(--green); }
+  .kpi-change.down { color: var(--pink); }
+
+  /* Charts Row */
+  .charts-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+  }
+
+  .chart-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .chart-title span { color: var(--muted); font-size: 0.75rem; font-weight: 400; }
+
+  /* MAIN CHART — the one to screenshot */
+  #revenue-chart-container {
+    position: relative;
+    height: 280px;
+  }
+
+  canvas#revenue-chart {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  /* Donut chart */
+  #donut-chart-container {
+    position: relative;
+    height: 280px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  canvas#donut-chart {
+    max-width: 220px;
+    max-height: 220px;
+  }
+
+  .donut-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-top: 1rem;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    font-family: 'Fira Code', monospace;
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  /* Data Table */
+  .data-table-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .data-table-card .chart-title {
+    padding: 1.2rem 1.2rem 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  thead th {
+    padding: 0.7rem 1rem;
+    text-align: left;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+  }
+
+  tbody td {
+    padding: 0.65rem 1rem;
+    font-size: 0.85rem;
+    font-family: 'Fira Code', monospace;
+    border-bottom: 1px solid var(--border);
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+
+  .status-badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+
+  .status-badge.active { background: rgba(52, 211, 153, 0.15); color: var(--green); }
+  .status-badge.pending { background: rgba(251, 146, 60, 0.15); color: var(--orange); }
+  .status-badge.inactive { background: rgba(244, 114, 182, 0.15); color: var(--pink); }
+</style>
+</head>
+<body>
+
+<div class="dash-header">
+  <h1>Analytics <span>Hub</span></h1>
+  <div class="header-controls">
+    <button class="period-btn" data-period="7d">7D</button>
+    <button class="period-btn active" data-period="30d" data-testid="period-30d">30D</button>
+    <button class="period-btn" data-period="90d">90D</button>
+  </div>
+</div>
+
+<!-- KPI ROW -->
+<div class="kpi-row" data-testid="kpi-row">
+  <div class="kpi-card" data-testid="kpi-revenue">
+    <div class="kpi-label">Revenue</div>
+    <div class="kpi-value">$84.2K</div>
+    <div class="kpi-change up">+12.5%</div>
+  </div>
+  <div class="kpi-card" data-testid="kpi-users">
+    <div class="kpi-label">Active Users</div>
+    <div class="kpi-value">2,847</div>
+    <div class="kpi-change up">+8.3%</div>
+  </div>
+  <div class="kpi-card" data-testid="kpi-orders">
+    <div class="kpi-label">Orders</div>
+    <div class="kpi-value">1,234</div>
+    <div class="kpi-change down">-2.1%</div>
+  </div>
+  <div class="kpi-card" data-testid="kpi-conversion">
+    <div class="kpi-label">Conversion</div>
+    <div class="kpi-value">3.6%</div>
+    <div class="kpi-change up">+0.4%</div>
+  </div>
+</div>
+
+<!-- CHARTS ROW -->
+<div class="charts-row">
+  <!-- THIS IS THE TARGET CHART FOR VISUAL REGRESSION -->
+  <div class="chart-card" id="revenue-chart-card" data-testid="revenue-chart-card">
+    <div class="chart-title">
+      Revenue Over Time <span>Last 30 days</span>
+    </div>
+    <div id="revenue-chart-container" data-testid="revenue-chart-container">
+      <canvas id="revenue-chart" data-testid="revenue-chart"></canvas>
+    </div>
+  </div>
+
+  <div class="chart-card" data-testid="donut-chart-card">
+    <div class="chart-title">
+      Revenue by Category
+    </div>
+    <div id="donut-chart-container">
+      <canvas id="donut-chart" data-testid="donut-chart"></canvas>
+    </div>
+    <div class="donut-legend" data-testid="donut-legend">
+      <div class="legend-item"><div class="legend-dot" style="background: #5b8def;"></div> Electronics — 42%</div>
+      <div class="legend-item"><div class="legend-dot" style="background: #a78bfa;"></div> Clothing — 28%</div>
+      <div class="legend-item"><div class="legend-dot" style="background: #f472b6;"></div> Home — 18%</div>
+      <div class="legend-item"><div class="legend-dot" style="background: #fb923c;"></div> Other — 12%</div>
+    </div>
+  </div>
+</div>
+
+<!-- DATA TABLE -->
+<div class="data-table-card" data-testid="data-table">
+  <div class="chart-title">Recent Transactions</div>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Customer</th>
+        <th>Amount</th>
+        <th>Status</th>
+        <th>Date</th>
+      </tr>
+    </thead>
+    <tbody data-testid="transaction-table-body">
+      <tr><td>#1042</td><td>Alice Johnson</td><td>$249.99</td><td><span class="status-badge active">Active</span></td><td>Mar 01</td></tr>
+      <tr><td>#1041</td><td>Bob Smith</td><td>$89.50</td><td><span class="status-badge active">Active</span></td><td>Mar 01</td></tr>
+      <tr><td>#1040</td><td>Carol White</td><td>$520.00</td><td><span class="status-badge pending">Pending</span></td><td>Feb 28</td></tr>
+      <tr><td>#1039</td><td>Dave Brown</td><td>$34.99</td><td><span class="status-badge active">Active</span></td><td>Feb 28</td></tr>
+      <tr><td>#1038</td><td>Eve Davis</td><td>$175.00</td><td><span class="status-badge inactive">Refunded</span></td><td>Feb 27</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+  // --- DETERMINISTIC CHART DATA (no randomness, same every render) ---
+  const revenueData = [
+    2100, 2350, 1980, 2700, 2450, 3100, 2800, 3250, 2950, 3400,
+    3100, 2700, 3500, 3200, 3800, 3600, 4100, 3900, 3500, 4200,
+    3800, 4500, 4100, 4300, 3900, 4600, 4200, 4800, 4400, 5100
+  ];
+
+  const labels = Array.from({ length: 30 }, (_, i) => {
+    const d = new Date(2026, 1, i + 1); // Feb 2026
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  });
+
+  // --- REVENUE LINE CHART (Canvas) ---
+  function drawRevenueChart() {
+    const canvas = document.getElementById('revenue-chart');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('revenue-chart-container');
+
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = container.clientWidth * dpr;
+    canvas.height = container.clientHeight * dpr;
+    ctx.scale(dpr, dpr);
+
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    const padding = { top: 20, right: 20, bottom: 40, left: 60 };
+
+    const chartW = w - padding.left - padding.right;
+    const chartH = h - padding.top - padding.bottom;
+
+    const maxVal = Math.max(...revenueData) * 1.1;
+    const minVal = 0;
+
+    // Grid lines
+    ctx.strokeStyle = '#2e2e38';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= 5; i++) {
+      const y = padding.top + (chartH / 5) * i;
+      ctx.beginPath();
+      ctx.moveTo(padding.left, y);
+      ctx.lineTo(w - padding.right, y);
+      ctx.stroke();
+
+      // Y labels
+      const val = maxVal - (maxVal / 5) * i;
+      ctx.fillStyle = '#6e6e80';
+      ctx.font = '11px "Fira Code", monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(`$${(val / 1000).toFixed(1)}K`, padding.left - 8, y + 4);
+    }
+
+    // X labels
+    ctx.textAlign = 'center';
+    for (let i = 0; i < labels.length; i += 5) {
+      const x = padding.left + (chartW / (revenueData.length - 1)) * i;
+      ctx.fillText(labels[i], x, h - 10);
+    }
+
+    // Area fill
+    ctx.beginPath();
+    ctx.moveTo(padding.left, padding.top + chartH);
+    revenueData.forEach((val, i) => {
+      const x = padding.left + (chartW / (revenueData.length - 1)) * i;
+      const y = padding.top + chartH - ((val - minVal) / (maxVal - minVal)) * chartH;
+      ctx.lineTo(x, y);
+    });
+    ctx.lineTo(padding.left + chartW, padding.top + chartH);
+    ctx.closePath();
+
+    const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartH);
+    gradient.addColorStop(0, 'rgba(91, 141, 239, 0.25)');
+    gradient.addColorStop(1, 'rgba(91, 141, 239, 0)');
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // Line
+    ctx.beginPath();
+    revenueData.forEach((val, i) => {
+      const x = padding.left + (chartW / (revenueData.length - 1)) * i;
+      const y = padding.top + chartH - ((val - minVal) / (maxVal - minVal)) * chartH;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = '#5b8def';
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    // Data points
+    revenueData.forEach((val, i) => {
+      const x = padding.left + (chartW / (revenueData.length - 1)) * i;
+      const y = padding.top + chartH - ((val - minVal) / (maxVal - minVal)) * chartH;
+      ctx.beginPath();
+      ctx.arc(x, y, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#5b8def';
+      ctx.fill();
+      ctx.strokeStyle = '#1a1a21';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    });
+  }
+
+  // --- DONUT CHART ---
+  function drawDonutChart() {
+    const canvas = document.getElementById('donut-chart');
+    const ctx = canvas.getContext('2d');
+
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = 220 * dpr;
+    canvas.height = 220 * dpr;
+    ctx.scale(dpr, dpr);
+
+    const cx = 110, cy = 110, r = 80, innerR = 50;
+    const data = [0.42, 0.28, 0.18, 0.12];
+    const colors = ['#5b8def', '#a78bfa', '#f472b6', '#fb923c'];
+
+    let start = -Math.PI / 2;
+    data.forEach((val, i) => {
+      const end = start + val * Math.PI * 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, start, end);
+      ctx.arc(cx, cy, innerR, end, start, true);
+      ctx.closePath();
+      ctx.fillStyle = colors[i];
+      ctx.fill();
+      start = end;
+    });
+
+    // Center text
+    ctx.fillStyle = '#ececf1';
+    ctx.font = 'bold 18px "Fira Code", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('$84.2K', cx, cy);
+  }
+
+  // --- PERIOD SWITCHING ---
+  document.querySelectorAll('.period-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      // Data stays the same (deterministic for visual regression)
+      drawRevenueChart();
+    });
+  });
+
+  // --- INIT ---
+  drawRevenueChart();
+  drawDonutChart();
+
+  window.addEventListener('resize', () => {
+    drawRevenueChart();
+    drawDonutChart();
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Challenge 24 — Performance & Throttle Testing</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:system-ui,sans-serif;background:#18181b;color:#fafafa;padding:2rem;max-width:850px;margin:0 auto}
+  h1{font-size:1.5rem;margin-bottom:0.3rem}
+  .subtitle{color:#71717a;font-size:0.8rem;margin-bottom:2rem}
+  .section{background:#27272a;border:1px solid #3f3f46;border-radius:10px;padding:1.5rem;margin-bottom:1rem}
+  .section h2{font-size:0.8rem;text-transform:uppercase;letter-spacing:1px;color:#71717a;margin-bottom:1rem}
+  .btn{padding:0.5rem 1rem;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.85rem;margin-right:0.5rem;margin-bottom:0.5rem}
+  .btn-blue{background:#3b82f6;color:white}.btn-red{background:#ef4444;color:white}.btn-green{background:#22c55e;color:white}.btn-gray{background:#3f3f46;color:#d4d4d8}
+  .metric{display:inline-flex;align-items:center;gap:0.4rem;padding:0.4rem 0.8rem;background:#3f3f46;border-radius:6px;font-family:monospace;font-size:0.8rem;margin-right:0.5rem;margin-bottom:0.5rem}
+  .metric .value{font-weight:700;color:#22c55e}
+  .metric .value.warn{color:#f59e0b}
+  .metric .value.bad{color:#ef4444}
+  .render-area{background:#18181b;border:1px solid #3f3f46;border-radius:8px;padding:0.5rem;min-height:100px;max-height:300px;overflow-y:auto;margin-top:0.8rem}
+  .render-item{display:inline-block;width:8px;height:8px;border-radius:2px;margin:1px}
+  .progress-bar{width:100%;height:8px;background:#3f3f46;border-radius:4px;overflow:hidden;margin-top:0.5rem}
+  .progress-fill{height:100%;background:#3b82f6;transition:width 0.1s;border-radius:4px}
+  .timer{font-family:monospace;font-size:1.5rem;font-weight:700;text-align:center;padding:1rem}
+  .long-task-log{max-height:150px;overflow-y:auto;font-family:monospace;font-size:0.75rem;color:#a1a1aa;margin-top:0.8rem}
+  .long-task-entry{padding:0.2rem 0.4rem;border-bottom:1px solid #3f3f46}
+  .throttle-controls{display:flex;gap:1rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem}
+  .throttle-controls label{font-size:0.85rem}
+  .throttle-controls select,.throttle-controls input{padding:0.4rem;background:#3f3f46;border:1px solid #52525b;border-radius:4px;color:#fafafa;font-family:monospace}
+</style>
+</head>
+<body>
+<h1>Performance Lab</h1>
+<p class="subtitle">Challenge 24 — Test under CPU/network throttle, measure render times, validate performance budgets</p>
+
+<!-- 1. RENDER PERFORMANCE -->
+<div class="section" data-testid="render-section">
+  <h2>1. Bulk Render Stress Test</h2>
+  <div class="throttle-controls">
+    <label>Items to render:</label>
+    <select id="render-count" data-testid="render-count"><option value="100">100</option><option value="500">500</option><option value="1000" selected>1,000</option><option value="5000">5,000</option><option value="10000">10,000</option></select>
+    <button class="btn btn-blue" data-testid="start-render">Render</button>
+    <button class="btn btn-gray" data-testid="clear-render">Clear</button>
+  </div>
+  <div>
+    <span class="metric">Render time: <span class="value" id="render-time" data-testid="render-time">—</span></span>
+    <span class="metric">Items: <span class="value" id="render-items" data-testid="render-items">0</span></span>
+    <span class="metric">FPS: <span class="value" id="fps-display" data-testid="fps-display">—</span></span>
+  </div>
+  <div class="render-area" id="render-area" data-testid="render-area"></div>
+</div>
+
+<!-- 2. DEBOUNCE/THROTTLE INPUT -->
+<div class="section" data-testid="input-section">
+  <h2>2. Input Debounce Performance</h2>
+  <p style="font-size:0.85rem;color:#a1a1aa;margin-bottom:0.8rem">Type rapidly. Each keystroke triggers a simulated "search" with configurable processing delay.</p>
+  <div class="throttle-controls">
+    <label>Processing delay:</label>
+    <select id="process-delay" data-testid="process-delay"><option value="0">0ms (instant)</option><option value="50">50ms</option><option value="200" selected>200ms</option><option value="500">500ms</option><option value="1000">1000ms</option></select>
+    <label>Debounce:</label>
+    <select id="debounce-delay" data-testid="debounce-delay"><option value="0">None</option><option value="150">150ms</option><option value="300" selected>300ms</option><option value="500">500ms</option></select>
+  </div>
+  <input type="text" id="perf-input" data-testid="perf-input" placeholder="Type to search..." style="width:100%;padding:0.6rem;background:#3f3f46;border:1px solid #52525b;border-radius:6px;color:#fafafa;font-size:0.9rem;margin-bottom:0.5rem">
+  <div>
+    <span class="metric">Keystrokes: <span class="value" id="keystroke-count" data-testid="keystroke-count">0</span></span>
+    <span class="metric">Searches fired: <span class="value" id="search-count" data-testid="search-count">0</span></span>
+    <span class="metric">Avg search time: <span class="value" id="avg-search" data-testid="avg-search">—</span></span>
+  </div>
+  <div id="search-result" data-testid="search-result" style="margin-top:0.5rem;font-size:0.85rem;color:#a1a1aa"></div>
+</div>
+
+<!-- 3. LONG TASK SIMULATION -->
+<div class="section" data-testid="long-task-section">
+  <h2>3. Long Task Blocking</h2>
+  <p style="font-size:0.85rem;color:#a1a1aa;margin-bottom:0.8rem">Simulate a CPU-heavy operation that blocks the main thread. Your test should verify the UI remains responsive (or detect when it's not).</p>
+  <div class="throttle-controls">
+    <label>Block duration:</label>
+    <select id="block-duration" data-testid="block-duration"><option value="100">100ms</option><option value="500">500ms</option><option value="1000">1s</option><option value="3000" selected>3s</option><option value="5000">5s</option></select>
+  </div>
+  <button class="btn btn-red" data-testid="start-blocking">Start Blocking Task</button>
+  <button class="btn btn-green" data-testid="start-async">Start Async (non-blocking)</button>
+  <button class="btn btn-blue" data-testid="ui-test-btn">Click Me During Task</button>
+  <div class="timer" id="block-timer" data-testid="block-timer">Ready</div>
+  <div class="progress-bar"><div class="progress-fill" id="block-progress" data-testid="block-progress"></div></div>
+  <div>
+    <span class="metric">UI responsive: <span class="value" id="ui-responsive" data-testid="ui-responsive">Yes</span></span>
+    <span class="metric">Click count: <span class="value" id="click-count" data-testid="click-count">0</span></span>
+    <span class="metric">Task status: <span class="value" id="task-status" data-testid="task-status">idle</span></span>
+  </div>
+  <div class="long-task-log" id="task-log" data-testid="task-log"></div>
+</div>
+
+<!-- 4. PERFORMANCE BUDGET -->
+<div class="section" data-testid="budget-section">
+  <h2>4. Performance Budgets</h2>
+  <p style="font-size:0.85rem;color:#a1a1aa;margin-bottom:0.8rem">Define max acceptable times. Run tests and verify they stay within budget.</p>
+  <div>
+    <span class="metric">Page load: <span class="value" id="budget-load" data-testid="budget-load">—</span></span>
+    <span class="metric">DOM nodes: <span class="value" id="budget-dom" data-testid="budget-dom">—</span></span>
+    <span class="metric">Memory (est): <span class="value" id="budget-memory" data-testid="budget-memory">—</span></span>
+    <span class="metric">Layout shifts: <span class="value" id="budget-cls" data-testid="budget-cls">0</span></span>
+  </div>
+  <button class="btn btn-blue" data-testid="measure-budgets" style="margin-top:0.5rem">Measure Now</button>
+</div>
+
+<script>
+let clickCount=0;
+
+// 1. RENDER
+document.querySelector('[data-testid="start-render"]').addEventListener('click',()=>{
+  const count=parseInt(document.getElementById('render-count').value);
+  const area=document.getElementById('render-area');area.innerHTML='';
+  const colors=['#3b82f6','#22c55e','#ef4444','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#f97316'];
+  const start=performance.now();
+  const frag=document.createDocumentFragment();
+  for(let i=0;i<count;i++){const el=document.createElement('div');el.className='render-item';el.style.background=colors[i%colors.length];el.setAttribute('data-testid',`item-${i}`);frag.appendChild(el);}
+  area.appendChild(frag);
+  const elapsed=performance.now()-start;
+  const timeEl=document.getElementById('render-time');timeEl.textContent=`${elapsed.toFixed(1)}ms`;
+  timeEl.className=`value${elapsed>100?' warn':''}${elapsed>500?' bad':''}`;
+  document.getElementById('render-items').textContent=count;
+});
+document.querySelector('[data-testid="clear-render"]').addEventListener('click',()=>{document.getElementById('render-area').innerHTML='';document.getElementById('render-time').textContent='—';document.getElementById('render-items').textContent='0';});
+
+// FPS counter
+let frameCount=0;let lastFpsTime=performance.now();
+function measureFps(){frameCount++;const now=performance.now();if(now-lastFpsTime>=1000){const fps=Math.round(frameCount*1000/(now-lastFpsTime));const el=document.getElementById('fps-display');el.textContent=fps;el.className=`value${fps<30?' bad':fps<50?' warn':''}`;frameCount=0;lastFpsTime=now;}requestAnimationFrame(measureFps);}
+requestAnimationFrame(measureFps);
+
+// 2. DEBOUNCE INPUT
+let keystrokes=0;let searches=0;let totalSearchTime=0;let debounceTimer;
+document.getElementById('perf-input').addEventListener('input',e=>{
+  keystrokes++;document.getElementById('keystroke-count').textContent=keystrokes;
+  const debounceMs=parseInt(document.getElementById('debounce-delay').value);
+  clearTimeout(debounceTimer);
+  debounceTimer=setTimeout(()=>{
+    const processMs=parseInt(document.getElementById('process-delay').value);
+    const start=performance.now();
+    // Simulate processing
+    const end=performance.now()+processMs;while(performance.now()<end){}
+    const elapsed=performance.now()-start;
+    searches++;totalSearchTime+=elapsed;
+    document.getElementById('search-count').textContent=searches;
+    document.getElementById('avg-search').textContent=`${(totalSearchTime/searches).toFixed(1)}ms`;
+    document.getElementById('search-result').textContent=`Results for "${e.target.value}" (${elapsed.toFixed(0)}ms)`;
+  },debounceMs);
+});
+
+// 3. LONG TASK
+function logTask(msg){const el=document.createElement('div');el.className='long-task-entry';el.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;document.getElementById('task-log').prepend(el);}
+
+document.querySelector('[data-testid="start-blocking"]').addEventListener('click',()=>{
+  const dur=parseInt(document.getElementById('block-duration').value);
+  document.getElementById('block-timer').textContent='Blocking...';
+  document.getElementById('task-status').textContent='blocking';
+  document.getElementById('ui-responsive').textContent='No';document.getElementById('ui-responsive').className='value bad';
+  logTask(`Blocking task started (${dur}ms)`);
+  const start=performance.now();
+  while(performance.now()-start<dur){}// Block main thread
+  const elapsed=performance.now()-start;
+  document.getElementById('block-timer').textContent=`Done in ${elapsed.toFixed(0)}ms`;
+  document.getElementById('task-status').textContent='idle';
+  document.getElementById('ui-responsive').textContent='Yes';document.getElementById('ui-responsive').className='value';
+  document.getElementById('block-progress').style.width='100%';
+  logTask(`Blocking task completed (${elapsed.toFixed(0)}ms)`);
+  setTimeout(()=>document.getElementById('block-progress').style.width='0%',1000);
+});
+
+document.querySelector('[data-testid="start-async"]').addEventListener('click',async()=>{
+  const dur=parseInt(document.getElementById('block-duration').value);
+  document.getElementById('block-timer').textContent='Running async...';
+  document.getElementById('task-status').textContent='running';
+  logTask(`Async task started (${dur}ms)`);
+  const chunkSize=50;const chunks=Math.ceil(dur/chunkSize);
+  for(let i=0;i<chunks;i++){
+    await new Promise(r=>setTimeout(r,chunkSize));
+    document.getElementById('block-progress').style.width=`${((i+1)/chunks)*100}%`;
+  }
+  document.getElementById('block-timer').textContent=`Done (async, ~${dur}ms)`;
+  document.getElementById('task-status').textContent='idle';
+  logTask('Async task completed');
+  setTimeout(()=>document.getElementById('block-progress').style.width='0%',1000);
+});
+
+document.querySelector('[data-testid="ui-test-btn"]').addEventListener('click',()=>{clickCount++;document.getElementById('click-count').textContent=clickCount;logTask(`UI click registered (#${clickCount})`);});
+
+// 4. BUDGETS
+document.querySelector('[data-testid="measure-budgets"]').addEventListener('click',()=>{
+  const loadTime=performance.timing?performance.timing.loadEventEnd-performance.timing.navigationStart:performance.now();
+  const domNodes=document.querySelectorAll('*').length;
+  const memEst=performance.memory?`${(performance.memory.usedJSHeapSize/1048576).toFixed(1)}MB`:'N/A';
+  const loadEl=document.getElementById('budget-load');loadEl.textContent=`${Math.round(loadTime)}ms`;loadEl.className=`value${loadTime>3000?' bad':loadTime>1000?' warn':''}`;
+  const domEl=document.getElementById('budget-dom');domEl.textContent=domNodes;domEl.className=`value${domNodes>1500?' bad':domNodes>800?' warn':''}`;
+  document.getElementById('budget-memory').textContent=memEst;
+});
+
+window.__PERF__={getClickCount:()=>clickCount,getKeystrokes:()=>keystrokes,getSearches:()=>searches,getFps:()=>document.getElementById('fps-display').textContent,getRenderTime:()=>document.getElementById('render-time').textContent,getTaskStatus:()=>document.getElementById('task-status').textContent};
+</script>
+</body>
+</html>

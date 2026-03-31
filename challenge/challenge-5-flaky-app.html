@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Challenge 5 — Flaky App (Retry Logic Stress Test)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;700&family=Nunito:wght@400;600;800&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #1b1d23;
+    --surface: #252830;
+    --surface-2: #2d303a;
+    --border: #383b47;
+    --text: #d4d4dc;
+    --muted: #7a7c88;
+    --red: #ef4444;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --blue: #3b82f6;
+    --purple: #8b5cf6;
+  }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 2rem;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  .header h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--red), var(--yellow), var(--green));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .header p {
+    color: var(--muted);
+    font-family: 'Inconsolata', monospace;
+    font-size: 0.85rem;
+    margin-top: 0.3rem;
+  }
+
+  .config-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    max-width: 700px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .config-panel h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 1rem;
+  }
+
+  .config-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .config-item label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-bottom: 0.3rem;
+    font-family: 'Inconsolata', monospace;
+  }
+
+  .config-item input, .config-item select {
+    width: 100%;
+    padding: 0.5rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'Inconsolata', monospace;
+    font-size: 0.9rem;
+  }
+
+  /* Test sections */
+  .test-sections {
+    max-width: 700px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .test-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+  }
+
+  .test-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.8rem;
+  }
+
+  .test-name {
+    font-weight: 700;
+    font-size: 1rem;
+  }
+
+  .test-tag {
+    font-family: 'Inconsolata', monospace;
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    background: var(--surface-2);
+    color: var(--muted);
+  }
+
+  .test-tag.timeout { border-left: 3px solid var(--yellow); }
+  .test-tag.not-found { border-left: 3px solid var(--red); }
+  .test-tag.assertion { border-left: 3px solid var(--purple); }
+  .test-tag.mixed { border-left: 3px solid var(--blue); }
+
+  .test-desc {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 1rem;
+    line-height: 1.5;
+  }
+
+  .test-area {
+    background: var(--surface-2);
+    border-radius: 8px;
+    padding: 1rem;
+    min-height: 60px;
+    position: relative;
+  }
+
+  .btn {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 600;
+    padding: 0.5rem 1.2rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+
+  .btn-run {
+    background: var(--blue);
+    color: white;
+  }
+
+  .btn-run:hover { opacity: 0.9; }
+
+  /* Element that appears/disappears (for not-found errors) */
+  .ghost-element {
+    padding: 0.8rem 1rem;
+    background: var(--surface);
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    font-family: 'Inconsolata', monospace;
+    font-size: 0.85rem;
+    transition: all 0.3s;
+  }
+
+  .ghost-element.hidden {
+    display: none;
+  }
+
+  /* Slow loading element */
+  .slow-loader {
+    display: none;
+  }
+
+  .slow-loader.visible {
+    display: block;
+    padding: 0.8rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--green);
+    border-radius: 6px;
+    font-family: 'Inconsolata', monospace;
+  }
+
+  /* Counter that changes */
+  .counter-display {
+    font-family: 'Inconsolata', monospace;
+    font-size: 2rem;
+    font-weight: 700;
+    text-align: center;
+    padding: 1rem;
+  }
+
+  /* Broken element */
+  .broken-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .broken-list li {
+    padding: 0.5rem 0.8rem;
+    background: var(--surface);
+    border-radius: 6px;
+    font-family: 'Inconsolata', monospace;
+    font-size: 0.85rem;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .broken-list li .value {
+    font-weight: 700;
+  }
+
+  /* Status indicators */
+  .status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: 'Inconsolata', monospace;
+    font-size: 0.8rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 4px;
+  }
+
+  .status-indicator.loading {
+    color: var(--yellow);
+    background: rgba(234, 179, 8, 0.1);
+  }
+
+  .status-indicator.success {
+    color: var(--green);
+    background: rgba(34, 197, 94, 0.1);
+  }
+
+  .status-indicator.error {
+    color: var(--red);
+    background: rgba(239, 68, 68, 0.1);
+  }
+
+  /* Activity log */
+  .activity-log {
+    max-width: 700px;
+    margin: 1.5rem auto 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+  }
+
+  .activity-log h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 0.8rem;
+  }
+
+  .log-entries {
+    max-height: 200px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .log-entry {
+    font-family: 'Inconsolata', monospace;
+    font-size: 0.78rem;
+    padding: 0.3rem 0.5rem;
+    border-radius: 4px;
+    background: var(--surface-2);
+  }
+
+  .log-entry.timeout { color: var(--yellow); }
+  .log-entry.not-found { color: var(--red); }
+  .log-entry.assertion { color: var(--purple); }
+  .log-entry.success { color: var(--green); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>The Flaky App</h1>
+  <p>Challenge 5 — An intentionally unreliable app for retry logic testing</p>
+</div>
+
+<!-- CONFIG -->
+<div class="config-panel" data-testid="config-panel">
+  <h2>Flakiness Configuration</h2>
+  <div class="config-grid">
+    <div class="config-item">
+      <label>Timeout Chance (%)</label>
+      <input type="number" id="timeout-chance" value="40" min="0" max="100" data-testid="timeout-chance">
+    </div>
+    <div class="config-item">
+      <label>Not-Found Chance (%)</label>
+      <input type="number" id="notfound-chance" value="30" min="0" max="100" data-testid="notfound-chance">
+    </div>
+    <div class="config-item">
+      <label>Max Delay (ms)</label>
+      <input type="number" id="max-delay" value="5000" min="500" max="15000" data-testid="max-delay">
+    </div>
+  </div>
+</div>
+
+<!-- TEST SCENARIOS -->
+<div class="test-sections">
+
+  <!-- TEST 1: Slow-loading element (timeout flake) -->
+  <div class="test-card" data-testid="test-slow-element">
+    <div class="test-card-header">
+      <span class="test-name">1. The Slow Element</span>
+      <span class="test-tag timeout">Timeout Flake</span>
+    </div>
+    <div class="test-desc">
+      Click the button. A data element will appear after a random delay (500ms to max-delay).
+      Sometimes it takes so long your test will timeout. Your retry logic should handle this.
+    </div>
+    <div class="test-area">
+      <button class="btn btn-run" id="trigger-slow" data-testid="trigger-slow">Load Data</button>
+      <div style="margin-top: 0.8rem;">
+        <div class="slow-loader" id="slow-result" data-testid="slow-result">
+          ✅ Data loaded: <span id="slow-data">{ users: 42, status: "ok" }</span>
+        </div>
+        <div id="slow-status" data-testid="slow-status"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TEST 2: Disappearing element (not-found flake) -->
+  <div class="test-card" data-testid="test-ghost-element">
+    <div class="test-card-header">
+      <span class="test-name">2. The Ghost Element</span>
+      <span class="test-tag not-found">Not-Found Flake</span>
+    </div>
+    <div class="test-desc">
+      This element randomly appears and disappears. Trying to interact with it when it's gone
+      causes an element-not-found error. It re-renders every 2 seconds.
+    </div>
+    <div class="test-area">
+      <div class="ghost-element" id="ghost-target" data-testid="ghost-target">
+        🎯 Click me! I'm here... for now.
+        <button class="btn btn-run" id="ghost-btn" data-testid="ghost-button" style="margin-left: 1rem;">Interact</button>
+      </div>
+      <div id="ghost-status" data-testid="ghost-status" style="margin-top: 0.5rem; font-family: 'Inconsolata', monospace; font-size: 0.8rem; color: var(--muted);"></div>
+      <div id="ghost-counter" data-testid="ghost-counter" style="font-family: 'Inconsolata', monospace; font-size: 0.8rem; color: var(--muted); margin-top: 0.3rem;">Successful clicks: 0</div>
+    </div>
+  </div>
+
+  <!-- TEST 3: Assertion flake (value changes) -->
+  <div class="test-card" data-testid="test-flaky-counter">
+    <div class="test-card-header">
+      <span class="test-name">3. The Unreliable Counter</span>
+      <span class="test-tag assertion">Assertion Flake</span>
+    </div>
+    <div class="test-desc">
+      This counter should increment by 1 each click, but sometimes it jumps by 2 or 3.
+      An assertion error (wrong value) should NOT trigger a retry — only timeout/not-found should.
+    </div>
+    <div class="test-area">
+      <div class="counter-display" id="counter-value" data-testid="counter-value">0</div>
+      <div style="text-align: center;">
+        <button class="btn btn-run" id="counter-btn" data-testid="counter-button">Increment</button>
+      </div>
+      <div id="counter-expected" data-testid="counter-expected" style="text-align: center; margin-top: 0.5rem; font-family: 'Inconsolata', monospace; font-size: 0.8rem; color: var(--muted);">Expected next: 1</div>
+    </div>
+  </div>
+
+  <!-- TEST 4: Combined flakes -->
+  <div class="test-card" data-testid="test-data-fetch">
+    <div class="test-card-header">
+      <span class="test-name">4. The Unreliable API</span>
+      <span class="test-tag mixed">Mixed Flakes</span>
+    </div>
+    <div class="test-desc">
+      Simulates an API call that can fail with: timeout (data takes too long), not-found (endpoint
+      temporarily unavailable), or return wrong data (assertion failure). All three failure types possible.
+    </div>
+    <div class="test-area">
+      <button class="btn btn-run" id="fetch-btn" data-testid="fetch-button">Fetch Data</button>
+      <div id="fetch-result" data-testid="fetch-result" style="margin-top: 0.8rem;"></div>
+      <ul class="broken-list" id="fetch-list" data-testid="fetch-list" style="margin-top: 0.5rem;"></ul>
+    </div>
+  </div>
+
+  <!-- TEST 5: Form submit with all flake types -->
+  <div class="test-card" data-testid="test-form-submit">
+    <div class="test-card-header">
+      <span class="test-name">5. The Flaky Form</span>
+      <span class="test-tag mixed">Mixed Flakes</span>
+    </div>
+    <div class="test-desc">
+      Fill in the form and submit. The submit button may disappear (not-found), the confirmation
+      may take forever (timeout), or the success message may show wrong data (assertion).
+    </div>
+    <div class="test-area">
+      <div style="display: flex; gap: 0.5rem; margin-bottom: 0.8rem;">
+        <input type="text" id="form-name" data-testid="form-name" placeholder="Name" value="John Doe"
+          style="flex: 1; padding: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: 'Inconsolata', monospace;">
+        <input type="email" id="form-email" data-testid="form-email" placeholder="Email" value="john@test.com"
+          style="flex: 1; padding: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: 'Inconsolata', monospace;">
+      </div>
+      <div id="form-submit-area" data-testid="form-submit-area">
+        <button class="btn btn-run" id="form-submit-btn" data-testid="form-submit-button">Submit</button>
+      </div>
+      <div id="form-result" data-testid="form-result" style="margin-top: 0.8rem; font-family: 'Inconsolata', monospace; font-size: 0.85rem;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ACTIVITY LOG -->
+<div class="activity-log" data-testid="activity-log">
+  <h2>Activity Log</h2>
+  <div class="log-entries" id="log-entries" data-testid="log-entries"></div>
+</div>
+
+<script>
+  // --- HELPERS ---
+  function getConfig() {
+    return {
+      timeoutChance: parseInt(document.getElementById('timeout-chance').value) / 100,
+      notFoundChance: parseInt(document.getElementById('notfound-chance').value) / 100,
+      maxDelay: parseInt(document.getElementById('max-delay').value)
+    };
+  }
+
+  function log(msg, type = '') {
+    const entries = document.getElementById('log-entries');
+    const el = document.createElement('div');
+    el.className = `log-entry ${type}`;
+    el.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    el.setAttribute('data-type', type);
+    entries.prepend(el);
+  }
+
+  function shouldFlake(chance) {
+    return Math.random() < chance;
+  }
+
+  // --- TEST 1: Slow Element ---
+  document.getElementById('trigger-slow').addEventListener('click', () => {
+    const config = getConfig();
+    const result = document.getElementById('slow-result');
+    const status = document.getElementById('slow-status');
+
+    result.classList.remove('visible');
+    status.innerHTML = '<span class="status-indicator loading">⏳ Loading...</span>';
+
+    const delay = 500 + Math.random() * config.maxDelay;
+    log(`Slow Element: loading with ${Math.round(delay)}ms delay`, 'timeout');
+
+    setTimeout(() => {
+      result.classList.add('visible');
+      status.innerHTML = '<span class="status-indicator success">✅ Loaded</span>';
+      log(`Slow Element: data loaded after ${Math.round(delay)}ms`, 'success');
+    }, delay);
+  });
+
+  // --- TEST 2: Ghost Element ---
+  let ghostClicks = 0;
+  const ghostTarget = document.getElementById('ghost-target');
+  const ghostStatus = document.getElementById('ghost-status');
+  const ghostCounter = document.getElementById('ghost-counter');
+
+  function ghostCycle() {
+    const config = getConfig();
+    if (shouldFlake(config.notFoundChance)) {
+      ghostTarget.classList.add('hidden');
+      ghostStatus.textContent = '👻 Element disappeared!';
+      log('Ghost Element: disappeared', 'not-found');
+    } else {
+      ghostTarget.classList.remove('hidden');
+      ghostStatus.textContent = '👀 Element is visible';
+    }
+  }
+
+  setInterval(ghostCycle, 2000);
+
+  document.getElementById('ghost-btn').addEventListener('click', () => {
+    ghostClicks++;
+    ghostCounter.textContent = `Successful clicks: ${ghostClicks}`;
+    log(`Ghost Element: clicked successfully (total: ${ghostClicks})`, 'success');
+  });
+
+  // --- TEST 3: Unreliable Counter ---
+  let counterValue = 0;
+  let expectedNext = 1;
+  const counterDisplay = document.getElementById('counter-value');
+  const counterExpected = document.getElementById('counter-expected');
+
+  document.getElementById('counter-btn').addEventListener('click', () => {
+    // 30% chance of wrong increment (assertion flake)
+    const increment = Math.random() < 0.3 ? (Math.floor(Math.random() * 3) + 2) : 1;
+    counterValue += increment;
+    counterDisplay.textContent = counterValue;
+    expectedNext = counterValue + 1;
+    counterExpected.textContent = `Expected next: ${expectedNext} (last increment: +${increment})`;
+
+    if (increment !== 1) {
+      log(`Counter: incremented by ${increment} instead of 1! (value: ${counterValue})`, 'assertion');
+    } else {
+      log(`Counter: correctly incremented to ${counterValue}`, 'success');
+    }
+  });
+
+  // --- TEST 4: Unreliable API ---
+  document.getElementById('fetch-btn').addEventListener('click', () => {
+    const config = getConfig();
+    const resultEl = document.getElementById('fetch-result');
+    const listEl = document.getElementById('fetch-list');
+
+    resultEl.innerHTML = '<span class="status-indicator loading">⏳ Fetching...</span>';
+    listEl.innerHTML = '';
+
+    // Decide failure type
+    if (shouldFlake(config.timeoutChance)) {
+      // Timeout: never resolves (or resolves after max delay)
+      const delay = config.maxDelay + 2000;
+      log(`API Fetch: will timeout (${delay}ms delay)`, 'timeout');
+      setTimeout(() => {
+        resultEl.innerHTML = '<span class="status-indicator error">⏰ Request timed out</span>';
+      }, delay);
+      return;
+    }
+
+    if (shouldFlake(config.notFoundChance)) {
+      // Not found: endpoint unavailable
+      setTimeout(() => {
+        resultEl.innerHTML = '<span class="status-indicator error">❌ 404: Endpoint not found</span>';
+        log('API Fetch: endpoint not found (404)', 'not-found');
+      }, 300);
+      return;
+    }
+
+    // Success (but sometimes with wrong data = assertion flake)
+    setTimeout(() => {
+      const wrongData = Math.random() < 0.25;
+      const data = wrongData
+        ? [
+            { name: 'Users', value: -1 },      // Wrong: negative
+            { name: 'Revenue', value: 0 },       // Wrong: zero
+            { name: 'Orders', value: 999999 },   // Wrong: absurd
+          ]
+        : [
+            { name: 'Users', value: 2847 },
+            { name: 'Revenue', value: 84200 },
+            { name: 'Orders', value: 1234 },
+          ];
+
+      resultEl.innerHTML = wrongData
+        ? '<span class="status-indicator error">⚠️ Data received but looks wrong</span>'
+        : '<span class="status-indicator success">✅ Data received</span>';
+
+      listEl.innerHTML = data.map(d =>
+        `<li data-testid="fetch-item"><span>${d.name}</span><span class="value">${d.value.toLocaleString()}</span></li>`
+      ).join('');
+
+      log(`API Fetch: ${wrongData ? 'wrong data received (assertion issue)' : 'correct data received'}`,
+        wrongData ? 'assertion' : 'success');
+    }, 500 + Math.random() * 1500);
+  });
+
+  // --- TEST 5: Flaky Form ---
+  const formSubmitArea = document.getElementById('form-submit-area');
+  const formResult = document.getElementById('form-result');
+
+  // Randomly hide submit button
+  setInterval(() => {
+    const config = getConfig();
+    const btn = document.getElementById('form-submit-btn');
+    if (btn && shouldFlake(config.notFoundChance * 0.5)) {
+      btn.style.display = 'none';
+      log('Form: submit button disappeared', 'not-found');
+      setTimeout(() => {
+        if (btn) btn.style.display = '';
+      }, 1500);
+    }
+  }, 3000);
+
+  document.getElementById('form-submit-btn')?.addEventListener('click', () => {
+    const config = getConfig();
+    const name = document.getElementById('form-name').value;
+    const email = document.getElementById('form-email').value;
+
+    formResult.innerHTML = '<span class="status-indicator loading">⏳ Submitting...</span>';
+
+    if (shouldFlake(config.timeoutChance * 0.6)) {
+      log('Form: submission timed out', 'timeout');
+      setTimeout(() => {
+        formResult.innerHTML = '<span class="status-indicator error">⏰ Submission timed out</span>';
+      }, config.maxDelay + 1000);
+      return;
+    }
+
+    setTimeout(() => {
+      const wrongConfirmation = Math.random() < 0.2;
+      if (wrongConfirmation) {
+        formResult.innerHTML = `<span class="status-indicator error">⚠️ Confirmed for: WRONG_USER (wrong-email@bug.com)</span>`;
+        formResult.setAttribute('data-submitted-name', 'WRONG_USER');
+        formResult.setAttribute('data-submitted-email', 'wrong-email@bug.com');
+        log('Form: wrong confirmation data (assertion issue)', 'assertion');
+      } else {
+        formResult.innerHTML = `<span class="status-indicator success">✅ Confirmed for: ${name} (${email})</span>`;
+        formResult.setAttribute('data-submitted-name', name);
+        formResult.setAttribute('data-submitted-email', email);
+        log(`Form: submitted successfully for ${name}`, 'success');
+      }
+    }, 800 + Math.random() * 2000);
+  });
+
+  // --- EXPOSE FOR TESTING ---
+  window.__FLAKY__ = {
+    getConfig,
+    getCounterValue: () => counterValue,
+    getGhostClicks: () => ghostClicks,
+    isGhostVisible: () => !ghostTarget.classList.contains('hidden'),
+    resetCounter: () => { counterValue = 0; counterDisplay.textContent = '0'; expectedNext = 1; },
+    setConfig: (timeout, notFound, maxDelay) => {
+      document.getElementById('timeout-chance').value = timeout;
+      document.getElementById('notfound-chance').value = notFound;
+      document.getElementById('max-delay').value = maxDelay;
+    }
+  };
+</script>
+</body>
+</html>

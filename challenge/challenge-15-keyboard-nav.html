@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Challenge 15 — Keyboard Navigation</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:system-ui,sans-serif;background:#fafaf9;color:#1c1917;padding:2rem;max-width:700px;margin:0 auto}
+  h1{font-size:1.5rem;margin-bottom:0.3rem}
+  .subtitle{color:#a8a29e;font-size:0.8rem;margin-bottom:2rem}
+  .section{background:#fff;border:1px solid #e7e5e4;border-radius:10px;padding:1.5rem;margin-bottom:1rem}
+  .section h2{font-size:0.8rem;text-transform:uppercase;letter-spacing:1px;color:#a8a29e;margin-bottom:1rem}
+  /* Dropdown menu */
+  .dropdown{position:relative;display:inline-block}
+  .dropdown-trigger{padding:0.6rem 1.2rem;background:#292524;color:white;border:none;border-radius:6px;cursor:pointer;font-size:0.9rem}
+  .dropdown-trigger:focus{outline:2px solid #3b82f6;outline-offset:2px}
+  .dropdown-menu{display:none;position:absolute;top:100%;left:0;margin-top:0.3rem;background:white;border:1px solid #e7e5e4;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);min-width:200px;z-index:10;padding:0.3rem}
+  .dropdown-menu.open{display:block}
+  .dropdown-item{display:block;width:100%;padding:0.5rem 0.8rem;border:none;background:none;text-align:left;cursor:pointer;font-size:0.85rem;border-radius:4px;font-family:inherit}
+  .dropdown-item:hover,.dropdown-item.focused{background:#f5f5f4}
+  .dropdown-item:focus{outline:2px solid #3b82f6;outline-offset:-2px}
+  /* Tabs */
+  .tab-list{display:flex;border-bottom:2px solid #e7e5e4;margin-bottom:1rem}
+  .tab-btn{padding:0.6rem 1.2rem;border:none;background:none;cursor:pointer;font-size:0.9rem;font-weight:600;color:#a8a29e;border-bottom:2px solid transparent;margin-bottom:-2px;font-family:inherit}
+  .tab-btn.active{color:#292524;border-bottom-color:#292524}
+  .tab-btn:focus{outline:2px solid #3b82f6;outline-offset:-2px;border-radius:4px 4px 0 0}
+  .tab-panel{padding:1rem;background:#fafaf9;border-radius:0 0 8px 8px;min-height:80px;font-size:0.9rem}
+  .tab-panel.hidden{display:none}
+  /* Accordion */
+  .accordion-item{border:1px solid #e7e5e4;border-radius:8px;margin-bottom:0.5rem;overflow:hidden}
+  .accordion-header{width:100%;padding:0.8rem 1rem;background:#fafaf9;border:none;cursor:pointer;font-size:0.9rem;font-weight:600;text-align:left;display:flex;justify-content:space-between;align-items:center;font-family:inherit}
+  .accordion-header:focus{outline:2px solid #3b82f6;outline-offset:-2px}
+  .accordion-header .arrow{transition:transform 0.2s}
+  .accordion-header.open .arrow{transform:rotate(180deg)}
+  .accordion-body{padding:0 1rem;max-height:0;overflow:hidden;transition:all 0.3s;font-size:0.85rem;color:#57534e}
+  .accordion-body.open{padding:0.8rem 1rem;max-height:200px}
+  /* Toolbar */
+  .toolbar{display:flex;gap:0.3rem;padding:0.5rem;background:#f5f5f4;border-radius:8px;margin-bottom:1rem}
+  .tool-btn{width:36px;height:36px;border:1px solid transparent;border-radius:6px;background:none;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center}
+  .tool-btn:focus{outline:2px solid #3b82f6;outline-offset:-2px}
+  .tool-btn.active{background:white;border-color:#e7e5e4;box-shadow:0 1px 2px rgba(0,0,0,0.05)}
+  .output{padding:1rem;background:#fafaf9;border-radius:8px;font-family:monospace;font-size:0.8rem;min-height:40px;color:#57534e;margin-top:0.8rem}
+  /* Focus log */
+  .focus-log{max-height:150px;overflow-y:auto;font-family:monospace;font-size:0.75rem;color:#a8a29e;background:#fafaf9;padding:0.8rem;border-radius:8px;margin-top:1rem}
+</style>
+</head>
+<body>
+<h1>Keyboard Navigator</h1>
+<p class="subtitle">Challenge 15 — Test full keyboard navigation: Tab, Arrow keys, Enter, Escape, focus management</p>
+
+<!-- 1. DROPDOWN -->
+<div class="section" data-testid="dropdown-section">
+  <h2>1. Dropdown Menu (Enter/Escape/Arrow keys)</h2>
+  <div class="dropdown" data-testid="dropdown">
+    <button class="dropdown-trigger" id="dropdown-trigger" data-testid="dropdown-trigger" aria-haspopup="true" aria-expanded="false">Select Action ▾</button>
+    <div class="dropdown-menu" id="dropdown-menu" data-testid="dropdown-menu" role="menu">
+      <button class="dropdown-item" role="menuitem" data-testid="item-edit" data-value="edit">✏️ Edit</button>
+      <button class="dropdown-item" role="menuitem" data-testid="item-duplicate" data-value="duplicate">📋 Duplicate</button>
+      <button class="dropdown-item" role="menuitem" data-testid="item-archive" data-value="archive">📦 Archive</button>
+      <button class="dropdown-item" role="menuitem" data-testid="item-delete" data-value="delete">🗑️ Delete</button>
+    </div>
+  </div>
+  <div class="output" id="dropdown-output" data-testid="dropdown-output">No action selected</div>
+</div>
+
+<!-- 2. TABS -->
+<div class="section" data-testid="tabs-section">
+  <h2>2. Tabs (Arrow keys to switch, Tab to enter content)</h2>
+  <div class="tab-list" role="tablist" data-testid="tab-list">
+    <button class="tab-btn active" role="tab" data-testid="tab-overview" aria-selected="true" data-panel="panel-overview">Overview</button>
+    <button class="tab-btn" role="tab" data-testid="tab-details" aria-selected="false" data-panel="panel-details">Details</button>
+    <button class="tab-btn" role="tab" data-testid="tab-reviews" aria-selected="false" data-panel="panel-reviews">Reviews</button>
+  </div>
+  <div class="tab-panel" id="panel-overview" data-testid="panel-overview" role="tabpanel">Overview content: This product has been our bestseller since 2024.</div>
+  <div class="tab-panel hidden" id="panel-details" data-testid="panel-details" role="tabpanel">Details: Weight 250g, Dimensions 10x5x3cm, Material: Aluminum.</div>
+  <div class="tab-panel hidden" id="panel-reviews" data-testid="panel-reviews" role="tabpanel">Reviews: ⭐⭐⭐⭐½ (4.5/5 from 128 reviews). <button data-testid="write-review-btn" style="margin-top:0.5rem;padding:0.3rem 0.8rem;border:1px solid #e7e5e4;border-radius:4px;background:white;cursor:pointer">Write a Review</button></div>
+</div>
+
+<!-- 3. ACCORDION -->
+<div class="section" data-testid="accordion-section">
+  <h2>3. Accordion (Enter/Space to toggle, focus management)</h2>
+  <div data-testid="accordion">
+    <div class="accordion-item"><button class="accordion-header" data-testid="acc-header-1" aria-expanded="false">What is your return policy? <span class="arrow">▼</span></button><div class="accordion-body" data-testid="acc-body-1">You can return any item within 30 days for a full refund.</div></div>
+    <div class="accordion-item"><button class="accordion-header" data-testid="acc-header-2" aria-expanded="false">Do you ship internationally? <span class="arrow">▼</span></button><div class="accordion-body" data-testid="acc-body-2">Yes, we ship to over 50 countries worldwide.</div></div>
+    <div class="accordion-item"><button class="accordion-header" data-testid="acc-header-3" aria-expanded="false">How do I track my order? <span class="arrow">▼</span></button><div class="accordion-body" data-testid="acc-body-3">Use the tracking link in your confirmation email.</div></div>
+  </div>
+</div>
+
+<!-- 4. TOOLBAR -->
+<div class="section" data-testid="toolbar-section">
+  <h2>4. Toolbar (Arrow keys to navigate, Enter to activate)</h2>
+  <div class="toolbar" role="toolbar" data-testid="toolbar" aria-label="Text formatting">
+    <button class="tool-btn" data-testid="tool-bold" data-action="bold" title="Bold">𝐁</button>
+    <button class="tool-btn" data-testid="tool-italic" data-action="italic" title="Italic">𝐼</button>
+    <button class="tool-btn" data-testid="tool-underline" data-action="underline" title="Underline">U̲</button>
+    <button class="tool-btn" data-testid="tool-strike" data-action="strike" title="Strikethrough">S̶</button>
+    <button class="tool-btn" data-testid="tool-code" data-action="code" title="Code">&lt;/&gt;</button>
+  </div>
+  <div class="output" id="toolbar-output" data-testid="toolbar-output">Active tools: none</div>
+</div>
+
+<!-- FOCUS LOG -->
+<div class="section" data-testid="focus-log-section">
+  <h2>Focus Tracking Log</h2>
+  <div class="focus-log" id="focus-log" data-testid="focus-log"></div>
+</div>
+
+<script>
+const focusLog=document.getElementById('focus-log');
+function logFocus(msg){focusLog.innerHTML+=`<div>[${new Date().toLocaleTimeString()}] ${msg}</div>`;focusLog.scrollTop=focusLog.scrollHeight;}
+
+// 1. DROPDOWN
+const trigger=document.getElementById('dropdown-trigger');
+const menu=document.getElementById('dropdown-menu');
+const items=[...menu.querySelectorAll('.dropdown-item')];
+let focusedIdx=-1;
+
+trigger.addEventListener('click',()=>toggleDropdown());
+trigger.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '||e.key==='ArrowDown'){e.preventDefault();openDropdown();focusItem(0);}});
+
+function toggleDropdown(){menu.classList.contains('open')?closeDropdown():openDropdown();}
+function openDropdown(){menu.classList.add('open');trigger.setAttribute('aria-expanded','true');logFocus('Dropdown opened');}
+function closeDropdown(){menu.classList.remove('open');trigger.setAttribute('aria-expanded','false');focusedIdx=-1;items.forEach(i=>i.classList.remove('focused'));trigger.focus();logFocus('Dropdown closed');}
+function focusItem(idx){if(idx<0)idx=items.length-1;if(idx>=items.length)idx=0;focusedIdx=idx;items.forEach(i=>i.classList.remove('focused'));items[idx].classList.add('focused');items[idx].focus();logFocus(`Dropdown focus: ${items[idx].dataset.value}`);}
+
+menu.addEventListener('keydown',e=>{
+  if(e.key==='ArrowDown'){e.preventDefault();focusItem(focusedIdx+1);}
+  else if(e.key==='ArrowUp'){e.preventDefault();focusItem(focusedIdx-1);}
+  else if(e.key==='Escape'){closeDropdown();}
+  else if(e.key==='Enter'||e.key===' '){e.preventDefault();if(focusedIdx>=0)selectItem(items[focusedIdx]);}
+});
+items.forEach(item=>item.addEventListener('click',()=>selectItem(item)));
+function selectItem(item){document.getElementById('dropdown-output').textContent=`Selected: ${item.dataset.value}`;logFocus(`Selected action: ${item.dataset.value}`);closeDropdown();}
+
+// 2. TABS
+const tabs=[...document.querySelectorAll('[role="tab"]')];
+const panels=[...document.querySelectorAll('[role="tabpanel"]')];
+function activateTab(tab){
+  tabs.forEach(t=>{t.classList.remove('active');t.setAttribute('aria-selected','false');});
+  panels.forEach(p=>p.classList.add('hidden'));
+  tab.classList.add('active');tab.setAttribute('aria-selected','true');
+  document.getElementById(tab.dataset.panel).classList.remove('hidden');
+  tab.focus();logFocus(`Tab activated: ${tab.textContent.trim()}`);
+}
+tabs.forEach((tab,i)=>{
+  tab.addEventListener('click',()=>activateTab(tab));
+  tab.addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'){e.preventDefault();activateTab(tabs[(i+1)%tabs.length]);}
+    if(e.key==='ArrowLeft'){e.preventDefault();activateTab(tabs[(i-1+tabs.length)%tabs.length]);}
+  });
+});
+
+// 3. ACCORDION
+document.querySelectorAll('.accordion-header').forEach(header=>{
+  header.addEventListener('click',()=>toggleAccordion(header));
+  header.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggleAccordion(header);}});
+});
+function toggleAccordion(header){
+  const body=header.nextElementSibling;const isOpen=body.classList.contains('open');
+  body.classList.toggle('open');header.classList.toggle('open');
+  header.setAttribute('aria-expanded',!isOpen);
+  logFocus(`Accordion ${isOpen?'closed':'opened'}: ${header.textContent.trim().replace(' ▼','')}`);
+}
+
+// 4. TOOLBAR
+const toolBtns=[...document.querySelectorAll('.tool-btn')];
+const activeTools=new Set();
+toolBtns.forEach((btn,i)=>{
+  btn.addEventListener('click',()=>{btn.classList.toggle('active');if(activeTools.has(btn.dataset.action))activeTools.delete(btn.dataset.action);else activeTools.add(btn.dataset.action);document.getElementById('toolbar-output').textContent=`Active tools: ${activeTools.size?[...activeTools].join(', '):'none'}`;logFocus(`Tool toggled: ${btn.dataset.action}`);});
+  btn.addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'){e.preventDefault();toolBtns[(i+1)%toolBtns.length].focus();}
+    if(e.key==='ArrowLeft'){e.preventDefault();toolBtns[(i-1+toolBtns.length)%toolBtns.length].focus();}
+  });
+});
+
+// Global focus tracker
+document.addEventListener('focusin',e=>{if(e.target.dataset?.testid)logFocus(`Focus → [${e.target.dataset.testid}] ${e.target.tagName}`);});
+</script>
+</body>
+</html>

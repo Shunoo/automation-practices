@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Challenge 12 — iFrame & Shadow DOM</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;600&family=Work+Sans:wght@400;600;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{--bg:#f8f9fa;--surface:#fff;--border:#dee2e6;--text:#212529;--muted:#868e96;--accent:#7048e8;--accent-light:#e5dbff}
+  body{font-family:'Work Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:2rem}
+  .container{max-width:800px;margin:0 auto}
+  h1{font-size:1.5rem;font-weight:700;margin-bottom:0.3rem}
+  .subtitle{color:var(--muted);font-size:0.8rem;margin-bottom:2rem}
+  .section{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;margin-bottom:1.5rem}
+  .section h2{font-size:0.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:1rem}
+  .section-label{font-family:'Source Code Pro',monospace;font-size:0.75rem;color:var(--accent);background:var(--accent-light);display:inline-block;padding:0.2rem 0.6rem;border-radius:4px;margin-bottom:0.8rem}
+  iframe{width:100%;height:250px;border:2px solid var(--border);border-radius:8px}
+  #shadow-host{border:2px dashed var(--accent);border-radius:8px;padding:1rem;min-height:100px}
+  .nested-section{margin-top:1rem;padding:1rem;background:var(--bg);border-radius:8px}
+  .comm-log{margin-top:1rem;background:var(--bg);border-radius:8px;padding:0.8rem;max-height:120px;overflow-y:auto;font-family:'Source Code Pro',monospace;font-size:0.8rem;color:var(--muted)}
+  .comm-entry{padding:0.2rem 0;border-bottom:1px solid var(--border)}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Deep DOM Challenge</h1>
+  <p class="subtitle">Challenge 12 — Interact with elements inside iFrames, Shadow DOM, and nested combinations</p>
+
+  <!-- SECTION 1: Simple iFrame -->
+  <div class="section" data-testid="iframe-section">
+    <div class="section-label">iFrame</div>
+    <h2>1. Embedded Form (iFrame)</h2>
+    <p style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem">Fill out the form inside the iframe and verify the submitted data from the parent.</p>
+    <iframe id="form-iframe" data-testid="form-iframe" srcdoc='
+      <!DOCTYPE html><html><head><style>
+      *{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui;padding:1rem;background:#fafafa}
+      input,select{width:100%;padding:0.5rem;border:1px solid #ddd;border-radius:6px;margin-bottom:0.6rem;font-family:inherit}
+      button{padding:0.5rem 1rem;background:#7048e8;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600}
+      .result{margin-top:0.8rem;padding:0.5rem;background:#e5dbff;border-radius:6px;font-size:0.85rem;display:none}
+      </style></head><body>
+      <input type="text" id="iframe-name" data-testid="iframe-name" placeholder="Your name">
+      <input type="email" id="iframe-email" data-testid="iframe-email" placeholder="Email">
+      <select id="iframe-role" data-testid="iframe-role"><option value="">Select role</option><option value="developer">Developer</option><option value="designer">Designer</option><option value="manager">Manager</option></select>
+      <button id="iframe-submit" data-testid="iframe-submit">Submit</button>
+      <div class="result" id="iframe-result" data-testid="iframe-result"></div>
+      <script>
+      document.getElementById("iframe-submit").addEventListener("click",function(){
+        var n=document.getElementById("iframe-name").value;var e=document.getElementById("iframe-email").value;var r=document.getElementById("iframe-role").value;
+        var result={name:n,email:e,role:r};
+        document.getElementById("iframe-result").style.display="block";
+        document.getElementById("iframe-result").textContent="Submitted: "+JSON.stringify(result);
+        window.parent.postMessage({type:"iframe-form-submit",data:result},"*");
+      });
+      <\/script></body></html>
+    '></iframe>
+    <div class="comm-log" id="iframe-log" data-testid="iframe-log"></div>
+  </div>
+
+  <!-- SECTION 2: Shadow DOM -->
+  <div class="section" data-testid="shadow-section">
+    <div class="section-label">Shadow DOM</div>
+    <h2>2. Custom Components (Shadow DOM)</h2>
+    <p style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem">Interact with elements hidden inside Shadow DOM boundaries.</p>
+    <div id="shadow-host" data-testid="shadow-host"></div>
+    <div class="nested-section">
+      <div class="section-label">Output</div>
+      <div id="shadow-output" data-testid="shadow-output" style="font-family:'Source Code Pro',monospace;font-size:0.85rem;color:var(--muted)">Waiting for interaction...</div>
+    </div>
+  </div>
+
+  <!-- SECTION 3: Nested iFrame + Shadow DOM -->
+  <div class="section" data-testid="nested-section">
+    <div class="section-label">iFrame + Shadow DOM</div>
+    <h2>3. The Deep Nest (iFrame containing Shadow DOM)</h2>
+    <p style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem">The hardest part: find and interact with elements inside Shadow DOM, which is inside an iFrame.</p>
+    <iframe id="nested-iframe" data-testid="nested-iframe" srcdoc='
+      <!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui;padding:1rem;background:#f0ebff}</style></head><body>
+      <div id="deep-shadow-host" data-testid="deep-shadow-host"></div>
+      <div id="deep-output" data-testid="deep-output" style="margin-top:1rem;padding:0.5rem;font-size:0.85rem;color:#666"></div>
+      <script>
+      var host=document.getElementById("deep-shadow-host");var shadow=host.attachShadow({mode:"open"});
+      shadow.innerHTML="<style>*{font-family:system-ui}input{padding:0.5rem;border:1px solid #ccc;border-radius:6px;width:100%;margin-bottom:0.5rem}button{padding:0.5rem 1rem;background:#7048e8;color:white;border:none;border-radius:6px;cursor:pointer}.counter{display:flex;align-items:center;gap:1rem;margin-bottom:0.5rem}.counter button{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center}.count{font-size:1.5rem;font-weight:700}</style><div><input type=\"text\" id=\"deep-input\" data-testid=\"deep-input\" placeholder=\"Type something deep...\"><div class=\"counter\"><button id=\"deep-dec\" data-testid=\"deep-dec\">−</button><span class=\"count\" id=\"deep-count\" data-testid=\"deep-count\">0</span><button id=\"deep-inc\" data-testid=\"deep-inc\">+</button></div><button id=\"deep-submit\" data-testid=\"deep-submit\">Send to Parent</button></div>";
+      var count=0;
+      shadow.getElementById("deep-inc").addEventListener("click",function(){count++;shadow.getElementById("deep-count").textContent=count;});
+      shadow.getElementById("deep-dec").addEventListener("click",function(){count--;shadow.getElementById("deep-count").textContent=count;});
+      shadow.getElementById("deep-submit").addEventListener("click",function(){
+        var val=shadow.getElementById("deep-input").value;
+        document.getElementById("deep-output").textContent="Sent: "+val+" (count: "+count+")";
+        window.parent.postMessage({type:"deep-submit",data:{text:val,count:count}},"*");
+      });
+      <\/script></body></html>
+    '></iframe>
+    <div class="comm-log" id="nested-log" data-testid="nested-log"></div>
+  </div>
+</div>
+<script>
+// Shadow DOM in parent
+const host=document.getElementById('shadow-host');
+const shadow=host.attachShadow({mode:'open'});
+shadow.innerHTML=`<style>*{font-family:'Work Sans',sans-serif}input{padding:0.5rem;border:1px solid #dee2e6;border-radius:6px;width:100%;margin-bottom:0.6rem;font-size:0.9rem}button{padding:0.5rem 1rem;background:#7048e8;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;margin-right:0.5rem}.toggle{display:flex;gap:0.5rem;margin-bottom:0.8rem}.toggle-btn{padding:0.4rem 1rem;border:1px solid #dee2e6;border-radius:6px;background:white;cursor:pointer;font-size:0.85rem}.toggle-btn.active{background:#7048e8;color:white;border-color:#7048e8}.hidden{display:none}</style>
+<input type="text" id="shadow-input" data-testid="shadow-input" placeholder="Type in the shadow...">
+<div class="toggle"><button class="toggle-btn active" data-testid="shadow-tab-a" id="tab-a">Tab A</button><button class="toggle-btn" data-testid="shadow-tab-b" id="tab-b">Tab B</button></div>
+<div id="panel-a" data-testid="shadow-panel-a"><p>Panel A content</p><button id="shadow-btn-a" data-testid="shadow-btn-a">Action A</button></div>
+<div id="panel-b" data-testid="shadow-panel-b" class="hidden"><p>Panel B content - the secret panel</p><button id="shadow-btn-b" data-testid="shadow-btn-b">Action B</button></div>`;
+
+shadow.getElementById('tab-a').addEventListener('click',()=>{shadow.getElementById('panel-a').classList.remove('hidden');shadow.getElementById('panel-b').classList.add('hidden');shadow.getElementById('tab-a').classList.add('active');shadow.getElementById('tab-b').classList.remove('active');});
+shadow.getElementById('tab-b').addEventListener('click',()=>{shadow.getElementById('panel-b').classList.remove('hidden');shadow.getElementById('panel-a').classList.add('hidden');shadow.getElementById('tab-b').classList.add('active');shadow.getElementById('tab-a').classList.remove('active');});
+shadow.getElementById('shadow-btn-a').addEventListener('click',()=>{document.getElementById('shadow-output').textContent=`Action A triggered with input: "${shadow.getElementById('shadow-input').value}"`;});
+shadow.getElementById('shadow-btn-b').addEventListener('click',()=>{document.getElementById('shadow-output').textContent=`Action B triggered (secret!) with input: "${shadow.getElementById('shadow-input').value}"`;});
+
+// Listen for iframe messages
+window.addEventListener('message',e=>{
+  if(e.data.type==='iframe-form-submit'){const log=document.getElementById('iframe-log');log.innerHTML+=`<div class="comm-entry" data-testid="iframe-log-entry">[${new Date().toLocaleTimeString()}] Received: ${JSON.stringify(e.data.data)}</div>`;}
+  if(e.data.type==='deep-submit'){const log=document.getElementById('nested-log');log.innerHTML+=`<div class="comm-entry" data-testid="nested-log-entry">[${new Date().toLocaleTimeString()}] Deep submit: ${JSON.stringify(e.data.data)}</div>`;}
+});
+window.__DOM__={getShadowRoot:()=>shadow,getIframeDoc:()=>document.getElementById('form-iframe').contentDocument,getNestedIframeDoc:()=>document.getElementById('nested-iframe').contentDocument};
+</script>
+</body>
+</html>

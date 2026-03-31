@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Challenge 22 — Editable Data Grid</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:system-ui,sans-serif;background:#f8fafc;color:#0f172a;padding:2rem;max-width:950px;margin:0 auto}
+  h1{font-size:1.5rem;margin-bottom:0.3rem}
+  .subtitle{color:#94a3b8;font-size:0.8rem;margin-bottom:2rem}
+  .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.8rem}
+  .toolbar-left{display:flex;gap:0.5rem;align-items:center}
+  .toolbar-right{display:flex;gap:0.5rem;align-items:center}
+  .search{padding:0.5rem 0.8rem;border:1px solid #e2e8f0;border-radius:6px;font-size:0.85rem;width:200px}
+  .btn{padding:0.4rem 0.8rem;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.8rem;transition:opacity 0.2s}
+  .btn:hover{opacity:0.9}
+  .btn:disabled{opacity:0.4;cursor:not-allowed}
+  .btn-primary{background:#3b82f6;color:white}.btn-danger{background:#ef4444;color:white}.btn-gray{background:#e2e8f0;color:#475569}.btn-success{background:#22c55e;color:white}
+  .selected-count{font-size:0.8rem;color:#64748b}
+  .table-container{background:white;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden}
+  table{width:100%;border-collapse:collapse}
+  thead th{padding:0.7rem 0.8rem;text-align:left;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;border-bottom:1px solid #e2e8f0;background:#f8fafc;user-select:none}
+  thead th.sortable{cursor:pointer}
+  thead th.sortable:hover{color:#0f172a}
+  thead th .sort-icon{margin-left:0.3rem;font-size:0.7rem}
+  tbody td{padding:0.6rem 0.8rem;font-size:0.85rem;border-bottom:1px solid #f1f5f9}
+  tbody tr:hover{background:#f8fafc}
+  tbody tr.selected{background:#eff6ff}
+  tbody tr.editing{background:#fffbeb}
+  .checkbox-cell{width:40px;text-align:center}
+  .checkbox-cell input{width:16px;height:16px;accent-color:#3b82f6}
+  .editable-cell{position:relative;cursor:pointer}
+  .editable-cell:hover{background:#f1f5f9;border-radius:4px}
+  .edit-input{width:100%;padding:0.3rem;border:1px solid #3b82f6;border-radius:4px;font-size:0.85rem;font-family:inherit;background:white}
+  .cell-actions{display:flex;gap:0.3rem}
+  .cell-btn{padding:0.2rem 0.5rem;border:none;border-radius:4px;cursor:pointer;font-size:0.75rem}
+  .cell-btn.save{background:#22c55e;color:white}.cell-btn.cancel{background:#e2e8f0;color:#475569}
+  .pagination{display:flex;justify-content:space-between;align-items:center;padding:1rem;border-top:1px solid #e2e8f0}
+  .pagination-info{font-size:0.8rem;color:#64748b}
+  .pagination-controls{display:flex;gap:0.3rem}
+  .page-btn{width:32px;height:32px;border:1px solid #e2e8f0;border-radius:6px;background:white;cursor:pointer;font-size:0.85rem;display:flex;align-items:center;justify-content:center}
+  .page-btn.active{background:#3b82f6;color:white;border-color:#3b82f6}
+  .page-btn:disabled{opacity:0.3;cursor:not-allowed}
+  .per-page{padding:0.3rem;border:1px solid #e2e8f0;border-radius:4px;font-size:0.8rem}
+  .toast{position:fixed;bottom:2rem;right:2rem;padding:0.6rem 1rem;border-radius:8px;color:white;font-size:0.85rem;font-weight:600;transform:translateY(80px);opacity:0;transition:all 0.3s;z-index:100}
+  .toast.show{transform:translateY(0);opacity:1}
+  .toast.success{background:#22c55e}.toast.error{background:#ef4444}
+</style>
+</head>
+<body>
+<h1>Data Grid Manager</h1>
+<p class="subtitle">Challenge 22 — Inline edit, sort, search, paginate, select & bulk actions on a data grid</p>
+
+<div class="toolbar" data-testid="toolbar">
+  <div class="toolbar-left">
+    <input type="text" class="search" id="search" data-testid="search-input" placeholder="Search employees...">
+    <select class="per-page" id="per-page" data-testid="per-page"><option value="5">5/page</option><option value="10" selected>10/page</option><option value="25">25/page</option></select>
+    <span class="selected-count" id="selected-count" data-testid="selected-count">0 selected</span>
+  </div>
+  <div class="toolbar-right">
+    <button class="btn btn-danger" id="bulk-delete" data-testid="bulk-delete" disabled>Delete Selected</button>
+    <button class="btn btn-primary" id="add-row" data-testid="add-row">+ Add Employee</button>
+  </div>
+</div>
+
+<div class="table-container" data-testid="table-container">
+  <table>
+    <thead data-testid="table-head">
+      <tr>
+        <th class="checkbox-cell"><input type="checkbox" id="select-all" data-testid="select-all"></th>
+        <th class="sortable" data-col="id" data-testid="th-id">ID <span class="sort-icon"></span></th>
+        <th class="sortable" data-col="name" data-testid="th-name">Name <span class="sort-icon"></span></th>
+        <th class="sortable" data-col="email" data-testid="th-email">Email <span class="sort-icon"></span></th>
+        <th class="sortable" data-col="role" data-testid="th-role">Role <span class="sort-icon"></span></th>
+        <th class="sortable" data-col="salary" data-testid="th-salary">Salary <span class="sort-icon"></span></th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="table-body" data-testid="table-body"></tbody>
+  </table>
+  <div class="pagination" data-testid="pagination">
+    <div class="pagination-info" id="page-info" data-testid="page-info"></div>
+    <div class="pagination-controls" id="page-controls" data-testid="page-controls"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" data-testid="toast"></div>
+
+<script>
+const roles=['Engineer','Designer','Manager','Analyst','Director','Intern','Lead','Architect'];
+let employees=[];
+for(let i=1;i<=53;i++){employees.push({id:i,name:`Employee ${i}`,email:`emp${i}@company.com`,role:roles[i%roles.length],salary:40000+Math.floor(Math.random()*80000),selected:false});}
+
+let sort={col:null,dir:'asc'};let searchQuery='';let currentPage=1;let perPage=10;let editingCell=null;
+
+function showToast(msg,type='success'){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast ${type} show`;setTimeout(()=>t.classList.remove('show'),2500);}
+
+function getFiltered(){
+  let data=[...employees];
+  if(searchQuery){const q=searchQuery.toLowerCase();data=data.filter(e=>e.name.toLowerCase().includes(q)||e.email.toLowerCase().includes(q)||e.role.toLowerCase().includes(q));}
+  if(sort.col){data.sort((a,b)=>{let va=a[sort.col],vb=b[sort.col];if(typeof va==='string'){va=va.toLowerCase();vb=vb.toLowerCase();}if(va<vb)return sort.dir==='asc'?-1:1;if(va>vb)return sort.dir==='asc'?1:-1;return 0;});}
+  return data;
+}
+
+function render(){
+  const filtered=getFiltered();const totalPages=Math.ceil(filtered.length/perPage);
+  if(currentPage>totalPages&&totalPages>0)currentPage=totalPages;
+  const start=(currentPage-1)*perPage;const pageData=filtered.slice(start,start+perPage);
+  const tbody=document.getElementById('table-body');tbody.innerHTML='';
+  pageData.forEach(emp=>{
+    const tr=document.createElement('tr');tr.setAttribute('data-testid',`row-${emp.id}`);tr.setAttribute('data-id',emp.id);
+    if(emp.selected)tr.classList.add('selected');
+    tr.innerHTML=`
+      <td class="checkbox-cell"><input type="checkbox" ${emp.selected?'checked':''} data-testid="check-${emp.id}" data-id="${emp.id}"></td>
+      <td data-testid="cell-id-${emp.id}">${emp.id}</td>
+      <td class="editable-cell" data-testid="cell-name-${emp.id}" data-col="name" data-id="${emp.id}">${emp.name}</td>
+      <td class="editable-cell" data-testid="cell-email-${emp.id}" data-col="email" data-id="${emp.id}">${emp.email}</td>
+      <td class="editable-cell" data-testid="cell-role-${emp.id}" data-col="role" data-id="${emp.id}">${emp.role}</td>
+      <td class="editable-cell" data-testid="cell-salary-${emp.id}" data-col="salary" data-id="${emp.id}">$${emp.salary.toLocaleString()}</td>
+      <td><button class="cell-btn cancel" data-testid="delete-${emp.id}" data-id="${emp.id}" style="background:#fee2e2;color:#dc2626">✕</button></td>`;
+    tbody.appendChild(tr);
+  });
+
+  // Pagination
+  document.getElementById('page-info').textContent=`Showing ${start+1}–${Math.min(start+perPage,filtered.length)} of ${filtered.length}`;
+  const controls=document.getElementById('page-controls');controls.innerHTML='';
+  const prevBtn=document.createElement('button');prevBtn.className='page-btn';prevBtn.textContent='‹';prevBtn.disabled=currentPage===1;prevBtn.setAttribute('data-testid','page-prev');prevBtn.addEventListener('click',()=>{currentPage--;render();});controls.appendChild(prevBtn);
+  for(let p=1;p<=totalPages;p++){const btn=document.createElement('button');btn.className=`page-btn${p===currentPage?' active':''}`;btn.textContent=p;btn.setAttribute('data-testid',`page-${p}`);btn.addEventListener('click',()=>{currentPage=p;render();});controls.appendChild(btn);}
+  const nextBtn=document.createElement('button');nextBtn.className='page-btn';nextBtn.textContent='›';nextBtn.disabled=currentPage===totalPages;nextBtn.setAttribute('data-testid','page-next');nextBtn.addEventListener('click',()=>{currentPage++;render();});controls.appendChild(nextBtn);
+
+  // Selection count
+  const selCount=employees.filter(e=>e.selected).length;
+  document.getElementById('selected-count').textContent=`${selCount} selected`;
+  document.getElementById('bulk-delete').disabled=selCount===0;
+  document.getElementById('select-all').checked=pageData.length>0&&pageData.every(e=>e.selected);
+
+  // Bind events
+  tbody.querySelectorAll('input[type="checkbox"]').forEach(cb=>{cb.addEventListener('change',()=>{const emp=employees.find(e=>e.id===parseInt(cb.dataset.id));if(emp)emp.selected=cb.checked;render();});});
+  tbody.querySelectorAll('.editable-cell').forEach(cell=>{cell.addEventListener('dblclick',()=>startEdit(cell));});
+  tbody.querySelectorAll('[data-testid^="delete-"]').forEach(btn=>{btn.addEventListener('click',()=>{employees=employees.filter(e=>e.id!==parseInt(btn.dataset.id));showToast('Employee deleted');render();});});
+
+  // Sort indicators
+  document.querySelectorAll('thead th.sortable .sort-icon').forEach(icon=>icon.textContent='');
+  if(sort.col){const th=document.querySelector(`th[data-col="${sort.col}"] .sort-icon`);if(th)th.textContent=sort.dir==='asc'?' ▲':' ▼';}
+}
+
+function startEdit(cell){
+  const id=parseInt(cell.dataset.id);const col=cell.dataset.col;const emp=employees.find(e=>e.id===id);if(!emp)return;
+  const currentVal=col==='salary'?emp[col]:emp[col];
+  cell.innerHTML=`<div style="display:flex;gap:0.3rem"><input class="edit-input" data-testid="edit-input-${id}-${col}" value="${currentVal}" autofocus><button class="cell-btn save" data-testid="save-${id}-${col}">✓</button><button class="cell-btn cancel" data-testid="cancel-${id}-${col}">✕</button></div>`;
+  const input=cell.querySelector('.edit-input');input.focus();input.select();
+  cell.querySelector('.save').addEventListener('click',()=>{emp[col]=col==='salary'?parseInt(input.value)||0:input.value;showToast(`Updated ${col} for #${id}`);render();});
+  cell.querySelector('.cancel').addEventListener('click',()=>render());
+  input.addEventListener('keydown',e=>{if(e.key==='Enter'){emp[col]=col==='salary'?parseInt(input.value)||0:input.value;showToast(`Updated ${col} for #${id}`);render();}if(e.key==='Escape')render();});
+}
+
+// Sort
+document.querySelectorAll('thead th.sortable').forEach(th=>{th.addEventListener('click',()=>{const col=th.dataset.col;if(sort.col===col)sort.dir=sort.dir==='asc'?'desc':'asc';else{sort.col=col;sort.dir='asc';}render();});});
+
+// Select all
+document.getElementById('select-all').addEventListener('change',e=>{const filtered=getFiltered();const start=(currentPage-1)*perPage;const pageIds=filtered.slice(start,start+perPage).map(emp=>emp.id);employees.forEach(emp=>{if(pageIds.includes(emp.id))emp.selected=e.target.checked;});render();});
+
+// Search
+let debounce;document.getElementById('search').addEventListener('input',e=>{clearTimeout(debounce);debounce=setTimeout(()=>{searchQuery=e.target.value.trim();currentPage=1;render();},300);});
+
+// Per page
+document.getElementById('per-page').addEventListener('change',e=>{perPage=parseInt(e.target.value);currentPage=1;render();});
+
+// Bulk delete
+document.getElementById('bulk-delete').addEventListener('click',()=>{const count=employees.filter(e=>e.selected).length;employees=employees.filter(e=>!e.selected);showToast(`Deleted ${count} employees`);render();});
+
+// Add row
+document.getElementById('add-row').addEventListener('click',()=>{const newId=Math.max(...employees.map(e=>e.id))+1;employees.push({id:newId,name:'New Employee',email:`new${newId}@company.com`,role:'Intern',salary:45000,selected:false});showToast('Employee added');currentPage=Math.ceil(employees.length/perPage);render();});
+
+render();
+window.__GRID__={getEmployees:()=>employees,getFiltered,getPage:()=>currentPage,getPerPage:()=>perPage,getSort:()=>sort,getSelected:()=>employees.filter(e=>e.selected)};
+</script>
+</body>
+</html>

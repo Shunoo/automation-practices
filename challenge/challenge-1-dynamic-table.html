@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Challenge 1 — Flaky-Proof Dynamic Table</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Outfit:wght@300;500;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0e1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --orange: #d29922;
+    --red: #f85149;
+  }
+
+  body {
+    font-family: 'Outfit', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 2rem;
+  }
+
+  .header {
+    margin-bottom: 2rem;
+  }
+
+  .header h1 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+  }
+
+  .header p {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-top: 0.3rem;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .status-bar {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+  }
+
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--muted);
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+  }
+
+  .status-dot.loading { background: var(--orange); }
+  .status-dot.done { background: var(--muted); animation: none; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .table-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  thead th {
+    background: rgba(88, 166, 255, 0.06);
+    padding: 0.85rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    user-select: none;
+  }
+
+  thead th.sortable {
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+
+  thead th.sortable:hover {
+    color: var(--accent);
+  }
+
+  thead th.sorted-asc::after { content: ' ▲'; color: var(--accent); }
+  thead th.sorted-desc::after { content: ' ▼'; color: var(--accent); }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    animation: fadeIn 0.4s ease;
+  }
+
+  tbody tr:last-child { border-bottom: none; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  tbody td {
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  tbody td:nth-child(3) { color: var(--green); }
+
+  .actions {
+    padding: 1rem;
+    display: flex;
+    justify-content: center;
+    border-top: 1px solid var(--border);
+  }
+
+  #load-more-btn {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 500;
+    padding: 0.6rem 2rem;
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+  }
+
+  #load-more-btn:hover:not(:disabled) {
+    background: rgba(88, 166, 255, 0.1);
+  }
+
+  #load-more-btn:disabled {
+    color: var(--muted);
+    border-color: var(--border);
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .skeleton-row td {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .skeleton-row td::after {
+    content: '';
+    display: block;
+    width: 70%;
+    height: 14px;
+    background: var(--border);
+    border-radius: 4px;
+    animation: shimmer 1.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { opacity: 0.3; }
+    50% { opacity: 0.6; }
+    100% { opacity: 0.3; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Product Inventory</h1>
+  <p>Challenge 1 — Dynamic async table with sorting</p>
+</div>
+
+<div class="status-bar">
+  <div class="status-item">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-text">Loading data...</span>
+  </div>
+  <div class="status-item">
+    <span>Rows: <span id="row-count">0</span></span>
+  </div>
+  <div class="status-item">
+    <span>Page: <span id="page-count">0</span> / <span id="total-pages">?</span></span>
+  </div>
+</div>
+
+<div class="table-container">
+  <table id="product-table">
+    <thead>
+      <tr>
+        <th class="sortable" data-column="id" data-type="number">ID</th>
+        <th class="sortable" data-column="name" data-type="string">Product Name</th>
+        <th class="sortable" data-column="price" data-type="number">Price ($)</th>
+        <th class="sortable" data-column="stock" data-type="number">Stock</th>
+        <th class="sortable" data-column="category" data-type="string">Category</th>
+      </tr>
+    </thead>
+    <tbody id="table-body">
+    </tbody>
+  </table>
+  <div class="actions">
+    <button id="load-more-btn" disabled>Load More</button>
+  </div>
+</div>
+
+<script>
+  // --- DATA GENERATION ---
+  const categories = ['Electronics', 'Clothing', 'Food', 'Books', 'Toys', 'Sports', 'Home', 'Garden'];
+  const adjectives = ['Premium', 'Deluxe', 'Basic', 'Ultra', 'Pro', 'Lite', 'Max', 'Mini'];
+  const nouns = ['Widget', 'Gadget', 'Device', 'Tool', 'Kit', 'Set', 'Pack', 'Unit'];
+
+  const ALL_DATA = [];
+  for (let i = 1; i <= 47; i++) {
+    ALL_DATA.push({
+      id: i,
+      name: `${adjectives[Math.floor(Math.random() * adjectives.length)]} ${nouns[Math.floor(Math.random() * nouns.length)]} ${i}`,
+      price: parseFloat((Math.random() * 500 + 5).toFixed(2)),
+      stock: Math.floor(Math.random() * 1000),
+      category: categories[Math.floor(Math.random() * categories.length)]
+    });
+  }
+
+  const PAGE_SIZE = 8;
+  const TOTAL_PAGES = Math.ceil(ALL_DATA.length / PAGE_SIZE);
+  let currentPage = 0;
+  let loadedData = [];
+  let currentSort = { column: null, direction: null };
+
+  const tbody = document.getElementById('table-body');
+  const loadMoreBtn = document.getElementById('load-more-btn');
+  const statusDot = document.getElementById('status-dot');
+  const statusText = document.getElementById('status-text');
+  const rowCount = document.getElementById('row-count');
+  const pageCount = document.getElementById('page-count');
+  const totalPages = document.getElementById('total-pages');
+
+  totalPages.textContent = TOTAL_PAGES;
+
+  // --- ASYNC ROW LOADING (random delays 500ms-3000ms per row) ---
+  function loadPage(page) {
+    return new Promise(async (resolve) => {
+      const start = page * PAGE_SIZE;
+      const end = Math.min(start + PAGE_SIZE, ALL_DATA.length);
+      const pageData = ALL_DATA.slice(start, end);
+
+      statusDot.className = 'status-dot loading';
+      statusText.textContent = 'Loading rows...';
+      loadMoreBtn.disabled = true;
+
+      // Show skeleton rows
+      for (let i = 0; i < pageData.length; i++) {
+        const skeletonRow = document.createElement('tr');
+        skeletonRow.className = 'skeleton-row';
+        skeletonRow.id = `skeleton-${start + i}`;
+        skeletonRow.innerHTML = '<td></td><td></td><td></td><td></td><td></td>';
+        tbody.appendChild(skeletonRow);
+      }
+
+      // Replace skeletons with real data at random intervals
+      for (let i = 0; i < pageData.length; i++) {
+        const delay = 500 + Math.random() * 2500;
+        await new Promise(r => setTimeout(r, delay));
+
+        const item = pageData[i];
+        loadedData.push(item);
+
+        const skeleton = document.getElementById(`skeleton-${start + i}`);
+        if (skeleton) {
+          skeleton.className = '';
+          skeleton.id = `row-${item.id}`;
+          skeleton.setAttribute('data-id', item.id);
+          skeleton.setAttribute('data-name', item.name);
+          skeleton.setAttribute('data-price', item.price);
+          skeleton.setAttribute('data-stock', item.stock);
+          skeleton.setAttribute('data-category', item.category);
+          skeleton.innerHTML = `
+            <td>${item.id}</td>
+            <td>${item.name}</td>
+            <td>${item.price.toFixed(2)}</td>
+            <td>${item.stock}</td>
+            <td>${item.category}</td>
+          `;
+        }
+
+        rowCount.textContent = loadedData.length;
+      }
+
+      currentPage = page + 1;
+      pageCount.textContent = currentPage;
+
+      // Apply current sort if active
+      if (currentSort.column) {
+        applySortToDOM();
+      }
+
+      if (currentPage >= TOTAL_PAGES) {
+        loadMoreBtn.disabled = true;
+        loadMoreBtn.textContent = 'All Data Loaded';
+        statusDot.className = 'status-dot done';
+        statusText.textContent = 'All data loaded';
+      } else {
+        loadMoreBtn.disabled = false;
+        statusDot.className = 'status-dot';
+        statusText.textContent = 'Ready';
+      }
+
+      resolve();
+    });
+  }
+
+  // --- SORTING ---
+  function applySortToDOM() {
+    const rows = Array.from(tbody.querySelectorAll('tr:not(.skeleton-row)'));
+    const col = currentSort.column;
+    const dir = currentSort.direction;
+    const type = document.querySelector(`th[data-column="${col}"]`)?.getAttribute('data-type');
+
+    rows.sort((a, b) => {
+      let valA = a.getAttribute(`data-${col}`);
+      let valB = b.getAttribute(`data-${col}`);
+
+      if (type === 'number') {
+        valA = parseFloat(valA);
+        valB = parseFloat(valB);
+      } else {
+        valA = valA.toLowerCase();
+        valB = valB.toLowerCase();
+      }
+
+      if (valA < valB) return dir === 'asc' ? -1 : 1;
+      if (valA > valB) return dir === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    // Re-append skeleton rows at end, sorted rows first
+    const skeletons = Array.from(tbody.querySelectorAll('.skeleton-row'));
+    tbody.innerHTML = '';
+    rows.forEach(r => tbody.appendChild(r));
+    skeletons.forEach(s => tbody.appendChild(s));
+  }
+
+  document.querySelectorAll('th.sortable').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.getAttribute('data-column');
+
+      // Toggle direction
+      if (currentSort.column === col) {
+        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+      } else {
+        currentSort.column = col;
+        currentSort.direction = 'asc';
+      }
+
+      // Update header classes
+      document.querySelectorAll('th.sortable').forEach(h => {
+        h.classList.remove('sorted-asc', 'sorted-desc');
+      });
+      th.classList.add(`sorted-${currentSort.direction}`);
+
+      applySortToDOM();
+    });
+  });
+
+  // --- LOAD MORE ---
+  loadMoreBtn.addEventListener('click', () => {
+    if (currentPage < TOTAL_PAGES) {
+      loadPage(currentPage);
+    }
+  });
+
+  // --- INITIAL LOAD ---
+  loadPage(0);
+</script>
+</body>
+</html>

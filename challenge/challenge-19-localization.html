@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Challenge 19 — Localization & i18n</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:system-ui,sans-serif;background:#f8fafc;color:#0f172a;padding:2rem;max-width:750px;margin:0 auto}
+  [dir="rtl"] body{font-family:'Segoe UI',Tahoma,sans-serif}
+  h1{font-size:1.5rem;margin-bottom:0.3rem}
+  .subtitle{color:#94a3b8;font-size:0.8rem;margin-bottom:2rem}
+  .lang-switcher{display:flex;gap:0.5rem;margin-bottom:2rem;flex-wrap:wrap}
+  .lang-btn{padding:0.5rem 1rem;border:1px solid #e2e8f0;border-radius:8px;background:white;cursor:pointer;font-size:0.85rem;transition:all 0.2s;display:flex;align-items:center;gap:0.4rem}
+  .lang-btn.active{background:#0f172a;color:white;border-color:#0f172a}
+  .lang-btn:hover:not(.active){background:#f1f5f9}
+  .section{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:1.5rem;margin-bottom:1rem}
+  .section h2{font-size:0.8rem;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:1rem}
+  .content-block{margin-bottom:1rem;padding:1rem;background:#f8fafc;border-radius:8px}
+  .content-block h3{font-size:1rem;margin-bottom:0.5rem}
+  .content-block p{font-size:0.9rem;color:#475569;line-height:1.6}
+  .form-group{margin-bottom:0.8rem}
+  .form-group label{display:block;font-size:0.85rem;font-weight:600;margin-bottom:0.3rem}
+  .form-group input,.form-group select{width:100%;padding:0.5rem;border:1px solid #e2e8f0;border-radius:6px;font-size:0.9rem;font-family:inherit}
+  .btn-submit{padding:0.6rem 1.5rem;background:#0f172a;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.9rem}
+  .price-display{font-size:1.5rem;font-weight:700;margin-bottom:0.5rem}
+  .date-display{font-size:0.9rem;color:#475569}
+  .number-display{font-size:0.9rem;color:#475569;margin-bottom:0.3rem}
+  .plural-test{padding:0.8rem;background:#f8fafc;border-radius:8px;margin-bottom:0.5rem;display:flex;justify-content:space-between;align-items:center}
+  .counter-controls{display:flex;gap:0.3rem}
+  .counter-controls button{width:30px;height:30px;border-radius:6px;border:1px solid #e2e8f0;background:white;cursor:pointer;font-size:1rem}
+  .direction-indicator{padding:0.4rem 0.8rem;background:#f1f5f9;border-radius:6px;font-size:0.8rem;color:#64748b;margin-bottom:1rem;display:inline-block}
+</style>
+</head>
+<body>
+<h1 data-testid="page-title" data-i18n="title">Product Store</h1>
+<p class="subtitle">Challenge 19 — Test language switching, RTL, number/date/currency formatting, pluralization</p>
+
+<div class="direction-indicator" data-testid="direction-indicator">Direction: <strong id="dir-display">LTR</strong> | Lang: <strong id="lang-display" data-testid="current-lang">en</strong></div>
+
+<div class="lang-switcher" data-testid="lang-switcher">
+  <button class="lang-btn active" data-lang="en" data-testid="lang-en">🇺🇸 English</button>
+  <button class="lang-btn" data-lang="pt" data-testid="lang-pt">🇵🇹 Português</button>
+  <button class="lang-btn" data-lang="de" data-testid="lang-de">🇩🇪 Deutsch</button>
+  <button class="lang-btn" data-lang="ja" data-testid="lang-ja">🇯🇵 日本語</button>
+  <button class="lang-btn" data-lang="ar" data-testid="lang-ar">🇸🇦 العربية</button>
+</div>
+
+<!-- TRANSLATED CONTENT -->
+<div class="section" data-testid="content-section">
+  <h2 data-i18n="section_content" data-testid="section-title">Content</h2>
+  <div class="content-block">
+    <h3 data-i18n="welcome" data-testid="welcome-title">Welcome to our store</h3>
+    <p data-i18n="welcome_text" data-testid="welcome-text">Browse our collection of premium products. We offer fast shipping and excellent customer support.</p>
+  </div>
+</div>
+
+<!-- NUMBER/CURRENCY/DATE FORMATTING -->
+<div class="section" data-testid="formatting-section">
+  <h2>Formatting</h2>
+  <div class="price-display" id="price-display" data-testid="price-display">$1,299.99</div>
+  <div class="number-display" data-testid="number-display" id="number-display">Population: 1,234,567</div>
+  <div class="number-display" data-testid="percent-display" id="percent-display">Growth: 42.5%</div>
+  <div class="date-display" data-testid="date-display" id="date-display">March 4, 2026</div>
+  <div class="date-display" data-testid="time-display" id="time-display" style="margin-top:0.3rem">2:30 PM</div>
+</div>
+
+<!-- PLURALIZATION -->
+<div class="section" data-testid="plural-section">
+  <h2>Pluralization</h2>
+  <div class="plural-test" data-testid="plural-items">
+    <span id="items-text" data-testid="items-text">You have 1 item in your cart</span>
+    <div class="counter-controls">
+      <button data-testid="items-dec" id="items-dec">−</button>
+      <strong id="items-count" data-testid="items-count">1</strong>
+      <button data-testid="items-inc" id="items-inc">+</button>
+    </div>
+  </div>
+  <div class="plural-test" data-testid="plural-reviews">
+    <span id="reviews-text" data-testid="reviews-text">128 reviews</span>
+    <div class="counter-controls">
+      <button data-testid="reviews-dec" id="reviews-dec">−</button>
+      <strong id="reviews-count" data-testid="reviews-count">128</strong>
+      <button data-testid="reviews-inc" id="reviews-inc">+</button>
+    </div>
+  </div>
+</div>
+
+<!-- FORM WITH TRANSLATED LABELS -->
+<div class="section" data-testid="form-section">
+  <h2 data-i18n="section_form">Contact Form</h2>
+  <div class="form-group"><label data-i18n="label_name" data-testid="label-name">Name</label><input type="text" data-testid="input-name" data-placeholder-i18n="placeholder_name" placeholder="Enter your name"></div>
+  <div class="form-group"><label data-i18n="label_email" data-testid="label-email">Email</label><input type="email" data-testid="input-email" data-placeholder-i18n="placeholder_email" placeholder="Enter your email"></div>
+  <div class="form-group"><label data-i18n="label_message" data-testid="label-message">Message</label><input type="text" data-testid="input-message" data-placeholder-i18n="placeholder_message" placeholder="Your message"></div>
+  <button class="btn-submit" data-i18n="btn_send" data-testid="btn-send">Send Message</button>
+</div>
+
+<script>
+const translations={
+  en:{title:'Product Store',section_content:'Content',welcome:'Welcome to our store',welcome_text:'Browse our collection of premium products. We offer fast shipping and excellent customer support.',section_form:'Contact Form',label_name:'Name',label_email:'Email',label_message:'Message',placeholder_name:'Enter your name',placeholder_email:'Enter your email',placeholder_message:'Your message',btn_send:'Send Message',item_zero:'You have no items in your cart',item_one:'You have 1 item in your cart',item_other:'You have {count} items in your cart',reviews_one:'{count} review',reviews_other:'{count} reviews'},
+  pt:{title:'Loja de Produtos',section_content:'Conteúdo',welcome:'Bem-vindo à nossa loja',welcome_text:'Navegue pela nossa coleção de produtos premium. Oferecemos envio rápido e excelente suporte ao cliente.',section_form:'Formulário de Contacto',label_name:'Nome',label_email:'E-mail',label_message:'Mensagem',placeholder_name:'Insira o seu nome',placeholder_email:'Insira o seu e-mail',placeholder_message:'A sua mensagem',btn_send:'Enviar Mensagem',item_zero:'Não tem itens no carrinho',item_one:'Tem 1 item no carrinho',item_other:'Tem {count} itens no carrinho',reviews_one:'{count} avaliação',reviews_other:'{count} avaliações'},
+  de:{title:'Produktladen',section_content:'Inhalt',welcome:'Willkommen in unserem Shop',welcome_text:'Durchstöbern Sie unsere Kollektion von Premium-Produkten. Wir bieten schnellen Versand und exzellenten Kundensupport.',section_form:'Kontaktformular',label_name:'Name',label_email:'E-Mail',label_message:'Nachricht',placeholder_name:'Geben Sie Ihren Namen ein',placeholder_email:'Geben Sie Ihre E-Mail ein',placeholder_message:'Ihre Nachricht',btn_send:'Nachricht senden',item_zero:'Sie haben keine Artikel im Warenkorb',item_one:'Sie haben 1 Artikel im Warenkorb',item_other:'Sie haben {count} Artikel im Warenkorb',reviews_one:'{count} Bewertung',reviews_other:'{count} Bewertungen'},
+  ja:{title:'製品ストア',section_content:'コンテンツ',welcome:'ストアへようこそ',welcome_text:'プレミアム製品のコレクションをご覧ください。迅速な配送と優れたカスタマーサポートを提供しています。',section_form:'お問い合わせフォーム',label_name:'名前',label_email:'メール',label_message:'メッセージ',placeholder_name:'名前を入力',placeholder_email:'メールを入力',placeholder_message:'メッセージを入力',btn_send:'送信',item_zero:'カートに商品はありません',item_one:'カートに{count}点の商品があります',item_other:'カートに{count}点の商品があります',reviews_one:'{count}件のレビュー',reviews_other:'{count}件のレビュー'},
+  ar:{title:'متجر المنتجات',section_content:'المحتوى',welcome:'مرحباً بكم في متجرنا',welcome_text:'تصفح مجموعتنا من المنتجات المميزة. نقدم شحن سريع ودعم عملاء ممتاز.',section_form:'نموذج الاتصال',label_name:'الاسم',label_email:'البريد الإلكتروني',label_message:'الرسالة',placeholder_name:'أدخل اسمك',placeholder_email:'أدخل بريدك الإلكتروني',placeholder_message:'رسالتك',btn_send:'إرسال الرسالة',item_zero:'لا توجد منتجات في سلة التسوق',item_one:'لديك منتج واحد في سلة التسوق',item_other:'لديك {count} منتجات في سلة التسوق',reviews_one:'مراجعة واحدة',reviews_other:'{count} مراجعات'}
+};
+
+const rtlLangs=['ar'];let currentLang='en';let itemsCount=1;let reviewsCount=128;
+
+function setLang(lang){
+  currentLang=lang;const t=translations[lang];
+  document.querySelectorAll('[data-i18n]').forEach(el=>{const key=el.getAttribute('data-i18n');if(t[key])el.textContent=t[key];});
+  document.querySelectorAll('[data-placeholder-i18n]').forEach(el=>{const key=el.getAttribute('data-placeholder-i18n');if(t[key])el.placeholder=t[key];});
+
+  // Direction
+  const isRtl=rtlLangs.includes(lang);
+  document.documentElement.setAttribute('dir',isRtl?'rtl':'ltr');
+  document.documentElement.setAttribute('lang',lang);
+  document.getElementById('dir-display').textContent=isRtl?'RTL':'LTR';
+  document.getElementById('lang-display').textContent=lang;
+
+  // Number/currency/date formatting
+  document.getElementById('price-display').textContent=new Intl.NumberFormat(lang,{style:'currency',currency:lang==='ja'?'JPY':lang==='ar'?'SAR':lang==='de'?'EUR':lang==='pt'?'EUR':'USD'}).format(1299.99);
+  document.getElementById('number-display').textContent=`${t.section_content||'Population'}: ${new Intl.NumberFormat(lang).format(1234567)}`;
+  document.getElementById('percent-display').textContent=`${new Intl.NumberFormat(lang,{style:'percent',minimumFractionDigits:1}).format(0.425)}`;
+  document.getElementById('date-display').textContent=new Intl.DateTimeFormat(lang,{year:'numeric',month:'long',day:'numeric'}).format(new Date(2026,2,4));
+  document.getElementById('time-display').textContent=new Intl.DateTimeFormat(lang,{hour:'2-digit',minute:'2-digit'}).format(new Date(2026,2,4,14,30));
+
+  // Buttons
+  document.querySelectorAll('.lang-btn').forEach(b=>{b.classList.toggle('active',b.dataset.lang===lang);});
+
+  updatePlurals();
+}
+
+function getPlural(key,count){
+  const t=translations[currentLang];
+  let form;
+  if(count===0)form=t[`${key}_zero`]||t[`${key}_other`];
+  else if(count===1)form=t[`${key}_one`]||t[`${key}_other`];
+  else form=t[`${key}_other`];
+  return form.replace('{count}',new Intl.NumberFormat(currentLang).format(count));
+}
+
+function updatePlurals(){
+  document.getElementById('items-text').textContent=getPlural('item',itemsCount);
+  document.getElementById('items-count').textContent=itemsCount;
+  document.getElementById('reviews-text').textContent=getPlural('reviews',reviewsCount);
+  document.getElementById('reviews-count').textContent=reviewsCount;
+}
+
+document.getElementById('items-inc').addEventListener('click',()=>{itemsCount++;updatePlurals();});
+document.getElementById('items-dec').addEventListener('click',()=>{if(itemsCount>0)itemsCount--;updatePlurals();});
+document.getElementById('reviews-inc').addEventListener('click',()=>{reviewsCount++;updatePlurals();});
+document.getElementById('reviews-dec').addEventListener('click',()=>{if(reviewsCount>0)reviewsCount--;updatePlurals();});
+
+document.querySelectorAll('.lang-btn').forEach(btn=>btn.addEventListener('click',()=>setLang(btn.dataset.lang)));
+setLang('en');
+
+window.__I18N__={getLang:()=>currentLang,getDirection:()=>document.documentElement.getAttribute('dir'),getTranslation:(key)=>translations[currentLang][key],setLang};
+</script>
+</body>
+</html>
