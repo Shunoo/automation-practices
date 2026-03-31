@@ -25,12 +25,10 @@ export class ProductInventory {
    * LoadMore products to the table
    */
   async loadMoreProducts() {
-    // check if it's possible to load more products
-    let canIClick = await this.loadMoreBtn.getAttribute("disable");
-    if (canIClick === null) {
+    let canIClick = await this.loadMoreBtn.isDisabled();
+    if (!canIClick) {
       await this.loadMoreBtn.click();
     }
-    await this.waitForTableToLoad();
   }
 
   /**
@@ -71,6 +69,9 @@ export class ProductInventory {
    *
    */
   async waitForTableToLoad() {
+    await expect(this.statustext).not.toHaveText("Loading rows...", {
+      timeout: 45_000,
+    });
     const text = await this.statustext.textContent();
     if (text === "All data loaded") {
       await expect(this.statustext).toHaveText("All data loaded", {
@@ -182,17 +183,13 @@ export class ProductInventory {
    * Load the page fully
    */
   async loadPageFully() {
-    let isItDone = false;
-    while (!isItDone) {
-      await this.waitForTableToLoad();
+    for (let i = 0; i < 6; i++) {
       await this.loadMoreProducts();
-      
-      if (await this.loadMoreBtn.textContent() === 'All Data Loaded') {
-        isItDone = true;
-      }
+      await this.waitForTableToLoad();
     }
+
     await this.validateDisableLoad();
-    await expect(this.pagecount.textContent).toBe("6");
-    await expect(this.totalpages.textContent).toBe("6");
+    await expect(await this.pagecount.textContent()).toBe("6");
+    await expect(await this.totalpages.textContent()).toBe("6");
   }
 }
