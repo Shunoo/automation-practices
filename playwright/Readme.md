@@ -8,16 +8,23 @@ This folder also contains a dedicated [`/playwright-agents`](../playwright-agent
 
 ## 📁 Folder Structure
 
+<details>
+<summary>Click to expand</summary>
+
 ```
 playwright/
 ├── tests/
 │   ├── challenge-1/
 │   │   └── challenge-1-dynamic-table.spec.ts
+│   ├── challenge-2/
+│   │   └── challenge-2-auth-token.spec.ts
 │   └── ...
 │
 ├── page-objects/
 │   ├── challenge-1/
 │   │   └── ProductInventory.ts
+│   ├── challenge-2/
+│   │   └── SecureVaultDashboard.ts
 │   └── ...
 │
 ├── entities/
@@ -27,12 +34,17 @@ playwright/
 │
 ├── playwright.config.ts
 ├── package.json
-└── README.md                 ← You are here
+└── README.md
 ```
+
+</details>
 
 ---
 
 ## 🚀 Setup
+
+<details>
+<summary>Click to expand</summary>
 
 ### Prerequisites
 
@@ -47,9 +59,14 @@ npm install
 npx playwright install
 ```
 
+</details>
+
 ---
 
 ## ▶️ Running Tests
+
+<details>
+<summary>Click to expand</summary>
 
 ```bash
 # Run all challenge tests
@@ -57,6 +74,7 @@ npx playwright test
 
 # Run a specific challenge
 npx playwright test challenge-1
+npx playwright test challenge-2
 
 # Run in headed mode (watch the browser)
 npx playwright test --headed
@@ -70,18 +88,23 @@ npx playwright test --project=firefox
 npx playwright test --project=webkit
 ```
 
+</details>
+
 ---
 
 ## 🧪 Approach & Patterns
+
+<details>
+<summary>Click to expand</summary>
 
 ### Page Object Model
 
 Each challenge has its own Page Object under `page-objects/challenge-N/`. The PO encapsulates all selectors and interactions, keeping the spec files clean and readable.
 
 ```
-tests/challenge-1/challenge-1-dynamic-table.spec.ts   ← what to test
-page-objects/challenge-1/ProductInventory.ts           ← how to interact
-entities/challenge-1/Product.ts                        ← data shape
+tests/challenge-N/spec.ts         ← what to test
+page-objects/challenge-N/PO.ts    ← how to interact
+entities/challenge-N/Entity.ts    ← data shape
 ```
 
 ### Entities
@@ -90,14 +113,17 @@ Typed entity classes under `entities/` define the data shape used across page ob
 
 ### No fixed waits
 
-All waits are condition-based. Example from `ProductInventory`:
+All waits are condition-based — no `sleep()`, no `waitForTimeout()`.
 
 ```typescript
-async waitForTableToLoad() {
-    await expect(this.statustext).not.toHaveText("Loading rows...", { timeout: 45_000 });
-    // then waits for either "Ready" or "All data loaded"
-}
+// Challenge 1 — wait for table status
+await expect(this.statustext).not.toHaveText("Loading rows...", { timeout: 45_000 });
+
+// Challenge 2 — wait for session expiry
+await expect(this.sessionInfo).toContainText("Storage token: cleared", { timeout: 35_000 });
 ```
+
+</details>
 
 ---
 
@@ -106,7 +132,7 @@ async waitForTableToLoad() {
 | # | Challenge | Status | Notes |
 |---|---|---|---|
 | 1 | Dynamic Table | 🟢 | POM + entity, condition-based waits, sort validation |
-| 2 | Auth Token | ⚪ | |
+| 2 | Auth Token | 🟢 | JWT lifecycle, storage validation, session expiry, re-login |
 | 3 | Multi-Tab | ⚪ | |
 | 4 | Visual Regression | ⚪ | |
 | 5 | Flaky App | ⚪ | |
@@ -135,13 +161,18 @@ async waitForTableToLoad() {
 
 ---
 
-## 🔍 Challenge 1 — Dynamic Table
+## 🔍 Challenge Details
+
+<details>
+<summary>✅ Challenge 1 — Dynamic Table</summary>
+
+<br>
 
 **File:** `tests/challenge-1/challenge-1-dynamic-table.spec.ts`  
 **Page Object:** `page-objects/challenge-1/ProductInventory.ts`  
 **Entity:** `entities/challenge-1/Product.ts`
 
-### What's tested
+### Tests
 
 | Test | Description |
 |---|---|
@@ -160,6 +191,45 @@ async waitForTableToLoad() {
 | `getDataFromList()` | Extracts all rows into typed `Product[]` array |
 | `loadMoreProducts()` | Clicks Load More if not disabled |
 | `loadPageFully()` | Loops until all pages loaded, asserts button disabled |
+
+</details>
+
+---
+
+<details>
+<summary>✅ Challenge 2 — Auth Token Lifecycle</summary>
+
+<br>
+
+**File:** `tests/challenge-2/challenge-2-auth-token.spec.ts`  
+**Page Object:** `page-objects/challenge-2/SecureVaultDashboard.ts`
+
+### Tests
+
+| Test | Description |
+|---|---|
+| Login + dashboard | Logs in, validates token visible, timer active, no expired overlay |
+| API call `/api/profile` | Clicks button, asserts 200 OK and user data in response log |
+| API call `/api/data` | Clicks button, asserts 200 OK and items payload in response log |
+| Session expiry overlay | Waits for storage to clear, asserts expired overlay visible |
+| Storage cleared after expiry | Validates localStorage is empty after token expires |
+| Re-login after expiry | Signs in again from expired state, verifies clean session restored |
+
+### Key methods in `SecureVaultDashboard`
+
+| Method | Purpose |
+|---|---|
+| `login(user, pass)` | Fills credentials and submits login form |
+| `validateLoginSuccess()` | Asserts token visible, timer active, no expired UI |
+| `validateSessionInfo(condition)` | Checks session panel for `active` or `expired` state |
+| `validateStorageData()` | Asserts `auth_token` present in localStorage |
+| `validateStorageClean()` | Asserts localStorage is fully empty |
+| `getApiProfile()` | Calls `/api/profile`, validates 200 and user payload in log |
+| `getApiData()` | Calls `/api/data`, validates 200 and items payload in log |
+| `validateExpiredOverlay()` | Asserts expired container and re-login button are visible |
+| `signInAgain(user, pass)` | Clicks re-login button, validates clean storage, logs in again |
+
+</details>
 
 ---
 
